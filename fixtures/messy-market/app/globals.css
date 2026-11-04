@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  --main-color: #0a7d5a;
+  --bg: #ffffff;
+  --text: #222222;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.btn-old {
+  padding: 8px 16px;
+  background: #0a7d5a;
+  color: white;
+}

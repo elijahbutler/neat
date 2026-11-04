@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f7f4ee;
+  --color-ink: #1b1a17;
+  --color-ink-muted: #5c5a55;
+  --color-brand: #e4572e;
+  --color-brand-ink: #ffffff;
+  --color-rule: #d9d4ca;
+  --radius-card: 1.25rem;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}

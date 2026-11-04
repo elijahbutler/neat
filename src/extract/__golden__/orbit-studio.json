@@ -1,0 +1,807 @@
+{
+  "schemaVersion": 1,
+  "project": "orbit-studio",
+  "commit": null,
+  "framework": {
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "tailwind": "4.3.3"
+  },
+  "uiLibraries": [
+    "class-variance-authority"
+  ],
+  "components": [
+    {
+      "name": "AboutPage",
+      "file": "app/about/page.tsx",
+      "line": 4,
+      "kind": "page",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "Layout",
+      "file": "app/layout.tsx",
+      "line": 7,
+      "kind": "layout",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "children",
+          "type": "ReactNode",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "Home",
+      "file": "app/page.tsx",
+      "line": 6,
+      "kind": "page",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "WorkPage",
+      "file": "app/work/[slug]/page.tsx",
+      "line": 9,
+      "kind": "page",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "params",
+          "type": "Promise<{ slug: string; }>",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "Button",
+      "file": "components/Button.tsx",
+      "line": 15,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "children",
+          "type": "ReactNode",
+          "optional": false
+        },
+        {
+          "name": "href",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "intent",
+          "type": "\"primary\" | \"quiet\"",
+          "optional": true,
+          "defaultValue": "'primary'"
+        }
+      ],
+      "variants": [
+        {
+          "prop": "intent",
+          "options": [
+            "primary",
+            "quiet"
+          ],
+          "defaultValue": "primary"
+        }
+      ]
+    },
+    {
+      "name": "Nav",
+      "file": "components/Nav.tsx",
+      "line": 9,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "ProjectCard",
+      "file": "components/ProjectCard.tsx",
+      "line": 6,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "project",
+          "type": "Project",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "Section",
+      "file": "components/Section.tsx",
+      "line": 6,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "children",
+          "type": "ReactNode",
+          "optional": false
+        },
+        {
+          "name": "tone",
+          "type": "\"paper\" | \"ink\"",
+          "optional": true,
+          "defaultValue": "'paper'"
+        },
+        {
+          "name": "width",
+          "type": "\"narrow\" | \"wide\"",
+          "optional": true,
+          "defaultValue": "'wide'"
+        }
+      ],
+      "variants": [
+        {
+          "prop": "tone",
+          "options": [
+            "ink",
+            "paper"
+          ],
+          "defaultValue": "paper"
+        },
+        {
+          "prop": "width",
+          "options": [
+            "narrow",
+            "wide"
+          ],
+          "defaultValue": "wide"
+        }
+      ]
+    },
+    {
+      "name": "Tag",
+      "file": "components/Tag.tsx",
+      "line": 14,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "children",
+          "type": "ReactNode",
+          "optional": false
+        },
+        {
+          "name": "tone",
+          "type": "\"neutral\" | \"brand\"",
+          "optional": true
+        }
+      ],
+      "variants": [
+        {
+          "prop": "tone",
+          "options": [
+            "brand",
+            "neutral"
+          ],
+          "defaultValue": "neutral"
+        }
+      ]
+    }
+  ],
+  "tokens": {
+    "variables": [
+      {
+        "name": "--color-paper",
+        "value": "#f7f4ee",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 4,
+        "resolved": "#f7f4ee"
+      },
+      {
+        "name": "--color-ink",
+        "value": "#1b1a17",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 5,
+        "resolved": "#1b1a17"
+      },
+      {
+        "name": "--color-ink-muted",
+        "value": "#5c5a55",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 6,
+        "resolved": "#5c5a55"
+      },
+      {
+        "name": "--color-brand",
+        "value": "#e4572e",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 7,
+        "resolved": "#e4572e"
+      },
+      {
+        "name": "--color-brand-ink",
+        "value": "#ffffff",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 8,
+        "resolved": "#ffffff"
+      },
+      {
+        "name": "--color-rule",
+        "value": "#d9d4ca",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 9,
+        "resolved": "#d9d4ca"
+      },
+      {
+        "name": "--radius-card",
+        "value": "1.25rem",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 10,
+        "resolved": "1.25rem"
+      },
+      {
+        "name": "--font-display",
+        "value": "\"Fraunces\", Georgia, serif",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 11,
+        "resolved": "\"Fraunces\", Georgia, serif"
+      },
+      {
+        "name": "--font-body",
+        "value": "\"Inter\", system-ui, sans-serif",
+        "scope": "@theme",
+        "file": "app/globals.css",
+        "line": 12,
+        "resolved": "\"Inter\", system-ui, sans-serif"
+      }
+    ],
+    "colors": {
+      "bg": {
+        "variable": "--color-paper",
+        "value": "#f7f4ee"
+      },
+      "fg": {
+        "variable": "--color-ink",
+        "value": "#1b1a17"
+      },
+      "fgMuted": {
+        "variable": "--color-ink-muted",
+        "value": "#5c5a55"
+      },
+      "accent": {
+        "variable": "--color-brand",
+        "value": "#e4572e"
+      },
+      "accentInk": {
+        "variable": "--color-brand-ink",
+        "value": "#ffffff"
+      },
+      "border": {
+        "variable": "--color-rule",
+        "value": "#d9d4ca"
+      }
+    },
+    "fonts": {
+      "display": {
+        "variable": "--font-display",
+        "value": "\"Fraunces\", Georgia, serif"
+      },
+      "body": {
+        "variable": "--font-body",
+        "value": "\"Inter\", system-ui, sans-serif"
+      }
+    },
+    "radius": {
+      "surface": {
+        "variable": "--radius-card",
+        "value": "1.25rem"
+      }
+    },
+    "unresolved": [
+      "color.bgElevated",
+      "font.mono",
+      "radius.control",
+      "radius.pill"
+    ]
+  },
+  "usage": {
+    "components": [
+      {
+        "component": "Section",
+        "file": "components/Section.tsx",
+        "line": 6,
+        "uses": 4,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 9
+          },
+          {
+            "file": "app/page.tsx",
+            "line": 17
+          },
+          {
+            "file": "app/about/page.tsx",
+            "line": 7
+          },
+          {
+            "file": "app/work/[slug]/page.tsx",
+            "line": 15
+          }
+        ],
+        "props": {
+          "tone": {
+            "ink": 1
+          },
+          "width": {
+            "narrow": 2
+          }
+        }
+      },
+      {
+        "component": "Button",
+        "file": "components/Button.tsx",
+        "line": 15,
+        "uses": 3,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 13
+          },
+          {
+            "file": "app/page.tsx",
+            "line": 14
+          },
+          {
+            "file": "components/Nav.tsx",
+            "line": 21
+          }
+        ],
+        "props": {
+          "href": {
+            "/about": 2,
+            "/work/harbor-coffee": 1
+          },
+          "intent": {
+            "quiet": 2
+          }
+        }
+      },
+      {
+        "component": "Tag",
+        "file": "components/Tag.tsx",
+        "line": 14,
+        "uses": 2,
+        "sites": [
+          {
+            "file": "components/ProjectCard.tsx",
+            "line": 12
+          },
+          {
+            "file": "app/about/page.tsx",
+            "line": 8
+          }
+        ],
+        "props": {
+          "tone": {
+            "brand": 1
+          }
+        }
+      },
+      {
+        "component": "Nav",
+        "file": "components/Nav.tsx",
+        "line": 9,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/layout.tsx",
+            "line": 11
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "ProjectCard",
+        "file": "components/ProjectCard.tsx",
+        "line": 6,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 20
+          }
+        ],
+        "props": {
+          "project": {
+            "{expression}": 1
+          }
+        }
+      }
+    ],
+    "classes": {
+      "spacing": [
+        {
+          "value": "gap-2",
+          "count": 2,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "gap-6",
+          "count": 2,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 19
+          }
+        },
+        {
+          "value": "mt-2",
+          "count": 2,
+          "example": {
+            "file": "components/ProjectCard.tsx",
+            "line": 10
+          }
+        },
+        {
+          "value": "mt-4",
+          "count": 2,
+          "example": {
+            "file": "components/ProjectCard.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "mt-6",
+          "count": 2,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "mx-auto",
+          "count": 2,
+          "example": {
+            "file": "components/Nav.tsx",
+            "line": 12
+          }
+        },
+        {
+          "value": "px-6",
+          "count": 2,
+          "example": {
+            "file": "components/Nav.tsx",
+            "line": 12
+          }
+        },
+        {
+          "value": "gap-3",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 12
+          }
+        },
+        {
+          "value": "mt-10",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 12
+          }
+        },
+        {
+          "value": "mt-8",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 19
+          }
+        },
+        {
+          "value": "p-6",
+          "count": 1,
+          "example": {
+            "file": "components/ProjectCard.tsx",
+            "line": 8
+          }
+        },
+        {
+          "value": "px-3",
+          "count": 1,
+          "example": {
+            "file": "components/Tag.tsx",
+            "line": 4
+          }
+        },
+        {
+          "value": "px-5",
+          "count": 1,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "py-1",
+          "count": 1,
+          "example": {
+            "file": "components/Tag.tsx",
+            "line": 4
+          }
+        },
+        {
+          "value": "py-2.5",
+          "count": 1,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 16
+          }
+        }
+      ],
+      "radius": [
+        {
+          "value": "rounded-full",
+          "count": 2,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "rounded-card",
+          "count": 1,
+          "example": {
+            "file": "components/ProjectCard.tsx",
+            "line": 8
+          }
+        }
+      ],
+      "fontSize": [
+        {
+          "value": "text-sm",
+          "count": 4,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "text-5xl",
+          "count": 2,
+          "example": {
+            "file": "app/about/page.tsx",
+            "line": 9
+          }
+        },
+        {
+          "value": "text-lg",
+          "count": 2,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "text-2xl",
+          "count": 1,
+          "example": {
+            "file": "components/ProjectCard.tsx",
+            "line": 10
+          }
+        },
+        {
+          "value": "text-3xl",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 18
+          }
+        },
+        {
+          "value": "text-6xl",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 10
+          }
+        },
+        {
+          "value": "text-xl",
+          "count": 1,
+          "example": {
+            "file": "components/Nav.tsx",
+            "line": 13
+          }
+        },
+        {
+          "value": "text-xs",
+          "count": 1,
+          "example": {
+            "file": "components/Tag.tsx",
+            "line": 4
+          }
+        }
+      ],
+      "color": [
+        {
+          "value": "text-ink-muted",
+          "count": 6,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "text-ink",
+          "count": 5,
+          "example": {
+            "file": "app/layout.tsx",
+            "line": 10
+          }
+        },
+        {
+          "value": "bg-paper",
+          "count": 4,
+          "example": {
+            "file": "app/layout.tsx",
+            "line": 10
+          }
+        },
+        {
+          "value": "border-rule",
+          "count": 3,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 6
+          }
+        },
+        {
+          "value": "bg-brand",
+          "count": 2,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 5
+          }
+        },
+        {
+          "value": "bg-ink",
+          "count": 2,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 6
+          }
+        },
+        {
+          "value": "text-brand-ink",
+          "count": 2,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 5
+          }
+        },
+        {
+          "value": "text-paper",
+          "count": 2,
+          "example": {
+            "file": "components/Button.tsx",
+            "line": 6
+          }
+        },
+        {
+          "value": "border-ink",
+          "count": 1,
+          "example": {
+            "file": "components/ProjectCard.tsx",
+            "line": 8
+          }
+        },
+        {
+          "value": "ring-rule",
+          "count": 1,
+          "example": {
+            "file": "components/Tag.tsx",
+            "line": 7
+          }
+        },
+        {
+          "value": "text-brand",
+          "count": 1,
+          "example": {
+            "file": "components/ProjectCard.tsx",
+            "line": 10
+          }
+        }
+      ]
+    },
+    "bypasses": [],
+    "repeatedClassLists": []
+  },
+  "facts": [
+    {
+      "id": "common:fontSize",
+      "text": "text-sm is the most common font size class (4 of 13)",
+      "evidence": [
+        {
+          "file": "components/Button.tsx",
+          "line": 16
+        }
+      ]
+    },
+    {
+      "id": "common:radius",
+      "text": "rounded-full is the most common radius class (2 of 3)",
+      "evidence": [
+        {
+          "file": "components/Button.tsx",
+          "line": 16
+        }
+      ]
+    },
+    {
+      "id": "variant:Button:intent",
+      "text": "Button uses intent=\"quiet\" in 2 of 3 places",
+      "evidence": [
+        {
+          "file": "app/page.tsx",
+          "line": 13
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 14
+        },
+        {
+          "file": "components/Nav.tsx",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "variant:Section:tone",
+      "text": "Section uses tone=\"paper\" in 3 of 4 places",
+      "evidence": [
+        {
+          "file": "app/page.tsx",
+          "line": 9
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 17
+        },
+        {
+          "file": "app/about/page.tsx",
+          "line": 7
+        },
+        {
+          "file": "app/work/[slug]/page.tsx",
+          "line": 15
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

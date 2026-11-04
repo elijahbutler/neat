@@ -1,0 +1,1073 @@
+{
+  "date": "2026-09-23T22:30:11.461Z",
+  "effort": "medium",
+  "maxAttempts": 3,
+  "summary": [
+    {
+      "model": "claude-sonnet-5",
+      "mode": "pipeline",
+      "passed": 9,
+      "of": 10,
+      "firstTry": 9,
+      "avgInputTokens": 4442,
+      "avgOutputTokens": 105,
+      "avgCostUsd": 0.0083,
+      "avgSeconds": 2.9
+    },
+    {
+      "model": "claude-sonnet-5",
+      "mode": "baseline",
+      "passed": 8,
+      "of": 10,
+      "firstTry": 8,
+      "avgInputTokens": 2461,
+      "avgOutputTokens": 385,
+      "avgCostUsd": 0.0095,
+      "avgSeconds": 4
+    },
+    {
+      "model": "claude-opus-5",
+      "mode": "pipeline",
+      "passed": 9,
+      "of": 10,
+      "firstTry": 9,
+      "avgInputTokens": 4442,
+      "avgOutputTokens": 70,
+      "avgCostUsd": 0.0223,
+      "avgSeconds": 2.4
+    },
+    {
+      "model": "claude-opus-5",
+      "mode": "baseline",
+      "passed": 10,
+      "of": 10,
+      "firstTry": 10,
+      "avgInputTokens": 2461,
+      "avgOutputTokens": 475,
+      "avgCostUsd": 0.0272,
+      "avgSeconds": 6.2
+    }
+  ],
+  "results": [
+    {
+      "task": "t01-retext",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 240,
+        "cacheRead": 0,
+        "cacheWrite": 2183,
+        "calls": 1
+      },
+      "costUsd": 0.01965375,
+      "ms": 7959,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Five people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t02-add-button",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 326,
+        "cacheRead": 0,
+        "cacheWrite": 2196,
+        "calls": 1
+      },
+      "costUsd": 0.021885,
+      "ms": 4490,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\nimport { Button } from '@/components/Button';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n        <div className=\"mt-8\">\n          <Button href=\"/\" intent=\"quiet\">See our work</Button>\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t03-primary",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 668,
+        "cacheRead": 0,
+        "cacheWrite": 2671,
+        "calls": 1
+      },
+      "costUsd": 0.03340375,
+      "ms": 7758,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"primary\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t04-smaller-heading",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 492,
+        "cacheRead": 0,
+        "cacheWrite": 2664,
+        "calls": 1
+      },
+      "costUsd": 0.02896,
+      "ms": 5438,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-5xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t05-add-tag",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 634,
+        "cacheRead": 0,
+        "cacheWrite": 2673,
+        "calls": 1
+      },
+      "costUsd": 0.03256625,
+      "ms": 7040,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <div className=\"mb-3\">\n          <Tag tone=\"brand\">New</Tag>\n        </div>\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t06-widen",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 239,
+        "cacheRead": 0,
+        "cacheWrite": 2178,
+        "calls": 1
+      },
+      "costUsd": 0.0195975,
+      "ms": 4261,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"wide\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t07-dark-section",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 465,
+        "cacheRead": 0,
+        "cacheWrite": 2009,
+        "calls": 1
+      },
+      "costUsd": 0.02419125,
+      "ms": 5535,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/work/[slug]/page.tsx",
+          "before": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <p className=\"font-body text-sm text-ink-muted\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section tone=\"ink\" width=\"narrow\">\n        <p className=\"font-body text-sm text-rule\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t08-muted-line",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 821,
+        "cacheRead": 0,
+        "cacheWrite": 2681,
+        "calls": 1
+      },
+      "costUsd": 0.03729125,
+      "ms": 9579,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <p className=\"mt-3 font-body text-base text-paper/70\">Recent projects for clients we love.</p>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ],
+      "regraded": {
+        "pass": true,
+        "failure": null,
+        "note": "Grader corrected after the run: the heading is on a dark section, so text-ink-muted is unreadable there."
+      }
+    },
+    {
+      "task": "t09-nav-link",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 439,
+        "cacheRead": 0,
+        "cacheWrite": 2666,
+        "calls": 1
+      },
+      "costUsd": 0.0276475,
+      "ms": 4192,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/Nav.tsx",
+          "before": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/about\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/contact\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t10-token-color",
+      "mode": "baseline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 423,
+        "cacheRead": 0,
+        "cacheWrite": 2670,
+        "calls": 1
+      },
+      "costUsd": 0.0272725,
+      "ms": 5321,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/ProjectCard.tsx",
+          "before": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl group-hover:text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t01-retext",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 48,
+        "cacheRead": 0,
+        "cacheWrite": 4229,
+        "calls": 1
+      },
+      "costUsd": 0.02764125,
+      "ms": 2522,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Five people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t02-add-button",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 80,
+        "cacheRead": 1402,
+        "cacheWrite": 2839,
+        "calls": 1
+      },
+      "costUsd": 0.02045475,
+      "ms": 2455,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\nimport { Button } from '@/components/Button';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n        <Button href=\"/\" intent=\"quiet\">See our work</Button>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t03-primary",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 45,
+        "cacheRead": 1402,
+        "cacheWrite": 3242,
+        "calls": 1
+      },
+      "costUsd": 0.0220985,
+      "ms": 2571,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t04-smaller-heading",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 54,
+        "cacheRead": 1402,
+        "cacheWrite": 3207,
+        "calls": 1
+      },
+      "costUsd": 0.02210475,
+      "ms": 2191,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-5xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t05-add-tag",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 170,
+        "cacheRead": 1402,
+        "cacheWrite": 3177,
+        "calls": 1
+      },
+      "costUsd": 0.02481725,
+      "ms": 3349,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\nimport Tag from '@/components/Tag';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <Tag tone=\"brand\">New</Tag>\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t06-widen",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 46,
+        "cacheRead": 1402,
+        "cacheWrite": 2796,
+        "calls": 1
+      },
+      "costUsd": 0.019336,
+      "ms": 2409,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section>\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t07-dark-section",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 55,
+        "cacheRead": 1402,
+        "cacheWrite": 2893,
+        "calls": 1
+      },
+      "costUsd": 0.02016725,
+      "ms": 2333,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/work/[slug]/page.tsx",
+          "before": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <p className=\"font-body text-sm text-ink-muted\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section width=\"narrow\" tone=\"ink\">\n        <p className=\"font-body text-sm text-ink-muted\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t08-muted-line",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": false,
+      "failure": "line color text-ink-muted doesn't read as muted on the dark section",
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 92,
+        "cacheRead": 1402,
+        "cacheWrite": 3185,
+        "calls": 1
+      },
+      "costUsd": 0.02291725,
+      "ms": 2647,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <p className=\"mt-3 font-body text-sm text-ink-muted\">Recent projects for clients we love.</p>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ],
+      "regraded": {
+        "pass": false,
+        "failure": "line color text-ink-muted doesn't read as muted on the dark section",
+        "note": "Grader corrected after the run: the heading is on a dark section, so text-ink-muted is unreadable there."
+      }
+    },
+    {
+      "task": "t09-nav-link",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 50,
+        "cacheRead": 1402,
+        "cacheWrite": 3173,
+        "calls": 1
+      },
+      "costUsd": 0.02179225,
+      "ms": 1541,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/Nav.tsx",
+          "before": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/about\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/contact\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t10-token-color",
+      "mode": "pipeline",
+      "model": "claude-opus-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 62,
+        "cacheRead": 1402,
+        "cacheWrite": 3044,
+        "calls": 1
+      },
+      "costUsd": 0.021286,
+      "ms": 2241,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/ProjectCard.tsx",
+          "before": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl group-hover:text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t01-retext",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 240,
+        "cacheRead": 0,
+        "cacheWrite": 2183,
+        "calls": 1
+      },
+      "costUsd": 0.0078615,
+      "ms": 4754,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Five people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t02-add-button",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 308,
+        "cacheRead": 2196,
+        "cacheWrite": 0,
+        "calls": 1
+      },
+      "costUsd": 0.0035231999999999998,
+      "ms": 2759,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\nimport { Button } from '@/components/Button';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n        <div className=\"mt-6\">\n          <Button href=\"/\" intent=\"quiet\">See our work</Button>\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t03-primary",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 461,
+        "cacheRead": 0,
+        "cacheWrite": 2671,
+        "calls": 1
+      },
+      "costUsd": 0.0112915,
+      "ms": 4216,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"primary\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t04-smaller-heading",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 462,
+        "cacheRead": 0,
+        "cacheWrite": 2664,
+        "calls": 1
+      },
+      "costUsd": 0.011284,
+      "ms": 4589,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-5xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t05-add-tag",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": false,
+      "failure": "label is not above the heading",
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 506,
+        "cacheRead": 0,
+        "cacheWrite": 2673,
+        "calls": 1
+      },
+      "costUsd": 0.0117465,
+      "ms": 4679,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <Tag tone=\"brand\">New</Tag>\n        <h1 className=\"mt-3 font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t06-widen",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 239,
+        "cacheRead": 0,
+        "cacheWrite": 2178,
+        "calls": 1
+      },
+      "costUsd": 0.007839,
+      "ms": 3362,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"wide\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t07-dark-section",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 335,
+        "cacheRead": 0,
+        "cacheWrite": 2009,
+        "calls": 1
+      },
+      "costUsd": 0.0083765,
+      "ms": 3697,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/work/[slug]/page.tsx",
+          "before": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <p className=\"font-body text-sm text-ink-muted\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section width=\"narrow\" tone=\"ink\">\n        <p className=\"font-body text-sm text-ink-muted\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t08-muted-line",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": false,
+      "failure": "line color text-ink-muted doesn't read as muted on the dark section",
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 506,
+        "cacheRead": 0,
+        "cacheWrite": 2681,
+        "calls": 1
+      },
+      "costUsd": 0.0117665,
+      "ms": 5718,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <p className=\"mt-2 font-body text-sm text-ink-muted\">Recent projects for clients we love.</p>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ],
+      "regraded": {
+        "pass": false,
+        "failure": "line color text-ink-muted doesn't read as muted on the dark section",
+        "note": "Grader corrected after the run: the heading is on a dark section, so text-ink-muted is unreadable there."
+      }
+    },
+    {
+      "task": "t09-nav-link",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 400,
+        "cacheRead": 0,
+        "cacheWrite": 2666,
+        "calls": 1
+      },
+      "costUsd": 0.010669,
+      "ms": 3189,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/Nav.tsx",
+          "before": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/about\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/contact\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t10-token-color",
+      "mode": "baseline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 393,
+        "cacheRead": 0,
+        "cacheWrite": 2670,
+        "calls": 1
+      },
+      "costUsd": 0.010609,
+      "ms": 3400,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/ProjectCard.tsx",
+          "before": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl group-hover:text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t01-retext",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 48,
+        "cacheRead": 1402,
+        "cacheWrite": 2827,
+        "calls": 1
+      },
+      "costUsd": 0.0078319,
+      "ms": 2138,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Five people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t02-add-button",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 80,
+        "cacheRead": 4241,
+        "cacheWrite": 0,
+        "calls": 1
+      },
+      "costUsd": 0.0016522000000000002,
+      "ms": 1684,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\nimport { Button } from '@/components/Button';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n        <Button href=\"/\" intent=\"quiet\">See our work</Button>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t03-primary",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 45,
+        "cacheRead": 1402,
+        "cacheWrite": 3242,
+        "calls": 1
+      },
+      "costUsd": 0.008839399999999999,
+      "ms": 2081,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t04-smaller-heading",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 54,
+        "cacheRead": 1402,
+        "cacheWrite": 3207,
+        "calls": 1
+      },
+      "costUsd": 0.0088419,
+      "ms": 2664,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-5xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t05-add-tag",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 149,
+        "cacheRead": 1402,
+        "cacheWrite": 3177,
+        "calls": 1
+      },
+      "costUsd": 0.009716899999999999,
+      "ms": 2679,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\nimport Tag from '@/components/Tag';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <Tag tone=\"brand\">New</Tag>\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t06-widen",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 49,
+        "cacheRead": 1402,
+        "cacheWrite": 2796,
+        "calls": 1
+      },
+      "costUsd": 0.007764399999999999,
+      "ms": 2377,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/about/page.tsx",
+          "before": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Section } from '@/components/Section';\nimport Tag from '@/components/Tag';\n\nexport default function AboutPage() {\n  return (\n    <main>\n      <Section width=\"wide\">\n        <Tag tone=\"brand\">About</Tag>\n        <h1 className=\"mt-4 font-display text-5xl\">Four people, one studio</h1>\n        <p className=\"mt-6 font-body text-lg text-ink-muted\">We started Orbit in 2019 to work on fewer projects, more carefully.</p>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t07-dark-section",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 55,
+        "cacheRead": 1402,
+        "cacheWrite": 2893,
+        "calls": 1
+      },
+      "costUsd": 0.0080669,
+      "ms": 3427,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/work/[slug]/page.tsx",
+          "before": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section width=\"narrow\">\n        <p className=\"font-body text-sm text-ink-muted\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { notFound } from 'next/navigation';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport function generateStaticParams() {\n  return projects.map((project) => ({ slug: project.slug }));\n}\n\nexport default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const project = projects.find((p) => p.slug === slug);\n  if (!project) notFound();\n  return (\n    <main>\n      <Section width=\"narrow\" tone=\"ink\">\n        <p className=\"font-body text-sm text-ink-muted\">{project.client}</p>\n        <h1 className=\"mt-2 font-display text-5xl\">{project.title}</h1>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t08-muted-line",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": false,
+      "failure": "line color text-ink-muted doesn't read as muted on the dark section",
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 88,
+        "cacheRead": 1402,
+        "cacheWrite": 3185,
+        "calls": 1
+      },
+      "costUsd": 0.0091269,
+      "ms": 2499,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "app/page.tsx",
+          "before": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n",
+          "after": "import { Button } from '@/components/Button';\nimport { ProjectCard } from '@/components/ProjectCard';\nimport { Section } from '@/components/Section';\nimport { projects } from '@/lib/projects';\n\nexport default function Home() {\n  return (\n    <main>\n      <Section>\n        <h1 className=\"font-display text-6xl leading-tight\">We design brands that people remember</h1>\n        <p className=\"mt-6 max-w-xl font-body text-lg text-ink-muted\">Orbit is a four-person studio working on identity, web, and print.</p>\n        <div className=\"mt-10 flex gap-3\">\n          <Button href=\"/about\">Start a project</Button>\n          <Button intent=\"quiet\" href=\"/work/harbor-coffee\">See our work</Button>\n        </div>\n      </Section>\n      <Section tone=\"ink\">\n        <h2 className=\"font-display text-3xl\">Selected work</h2>\n        <p className=\"mt-2 font-body text-ink-muted\">Recent projects for clients we love.</p>\n        <div className=\"mt-8 grid gap-6 md:grid-cols-3\">\n          {projects.map((project) => <ProjectCard key={project.slug} project={project} />)}\n        </div>\n      </Section>\n    </main>\n  );\n}\n"
+        }
+      ],
+      "regraded": {
+        "pass": false,
+        "failure": "line color text-ink-muted doesn't read as muted on the dark section",
+        "note": "Grader corrected after the run: the heading is on a dark section, so text-ink-muted is unreadable there."
+      }
+    },
+    {
+      "task": "t09-nav-link",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 50,
+        "cacheRead": 1402,
+        "cacheWrite": 3173,
+        "calls": 1
+      },
+      "costUsd": 0.0087169,
+      "ms": 2115,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/Nav.tsx",
+          "before": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/about\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport { Button } from './Button';\n\nconst links = [\n  { href: '/', label: 'Work' },\n  { href: '/about', label: 'About' },\n];\n\nexport default function Nav() {\n  return (\n    <header className=\"border-b border-rule bg-paper\">\n      <nav className=\"mx-auto flex max-w-6xl items-center justify-between px-6 py-5\">\n        <Link href=\"/\" className=\"font-display text-xl text-ink\">Orbit Studio</Link>\n        <ul className=\"flex items-center gap-6 font-body text-sm text-ink-muted\">\n          {links.map((link) => (\n            <li key={link.href}>\n              <Link href={link.href} className=\"hover:text-ink\">{link.label}</Link>\n            </li>\n          ))}\n          <li>\n            <Button href=\"/contact\" intent=\"quiet\">Start a project</Button>\n          </li>\n        </ul>\n      </nav>\n    </header>\n  );\n}\n"
+        }
+      ]
+    },
+    {
+      "task": "t10-token-color",
+      "mode": "pipeline",
+      "model": "claude-sonnet-5",
+      "pass": true,
+      "failure": null,
+      "attempts": 1,
+      "tokens": {
+        "input": 2,
+        "output": 429,
+        "cacheRead": 1402,
+        "cacheWrite": 3044,
+        "calls": 1
+      },
+      "costUsd": 0.0121844,
+      "ms": 7584,
+      "attemptErrors": [],
+      "diff": [
+        {
+          "file": "components/ProjectCard.tsx",
+          "before": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl group-hover:text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n",
+          "after": "import Link from 'next/link';\nimport Tag from './Tag';\n\nexport type Project = { slug: string; title: string; client: string; year: number; tags: string[] };\n\nexport function ProjectCard({ project }: { project: Project }) {\n  return (\n    <Link href={`/work/${project.slug}`} className=\"group block rounded-card border border-rule p-6 transition-colors hover:border-ink\">\n      <p className=\"font-body text-sm text-ink-muted\">{project.client}, {project.year}</p>\n      <h3 className=\"mt-2 font-display text-2xl text-brand group-hover:text-brand\">{project.title}</h3>\n      <div className=\"mt-4 flex flex-wrap gap-2\">\n        {project.tags.map((t) => <Tag key={t}>{t}</Tag>)}\n      </div>\n    </Link>\n  );\n}\n"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1221 @@
+{
+  "schemaVersion": 1,
+  "project": "acme-analytics",
+  "commit": null,
+  "framework": {
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "tailwind": "4.3.3"
+  },
+  "uiLibraries": [
+    "class-variance-authority",
+    "clsx",
+    "tailwind-merge"
+  ],
+  "components": [
+    {
+      "name": "RootLayout",
+      "file": "app/layout.tsx",
+      "line": 8,
+      "kind": "layout",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "children",
+          "type": "ReactNode",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "HomePage",
+      "file": "app/page.tsx",
+      "line": 11,
+      "kind": "page",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "PricingPage",
+      "file": "app/pricing/page.tsx",
+      "line": 10,
+      "kind": "page",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "BillingToggle",
+      "file": "components/billing-toggle.tsx",
+      "line": 8,
+      "kind": "component",
+      "exported": true,
+      "client": true,
+      "props": [
+        {
+          "name": "initial",
+          "type": "Period",
+          "optional": true,
+          "defaultValue": "'monthly'"
+        }
+      ],
+      "variants": [
+        {
+          "prop": "initial",
+          "options": [
+            "monthly",
+            "yearly"
+          ],
+          "defaultValue": "monthly"
+        }
+      ]
+    },
+    {
+      "name": "PricingCard",
+      "file": "components/pricing-card.tsx",
+      "line": 13,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "description",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "features",
+          "type": "string[]",
+          "optional": false
+        },
+        {
+          "name": "highlighted",
+          "type": "boolean",
+          "optional": true,
+          "defaultValue": "false"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "price",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "SiteHeader",
+      "file": "components/site-header.tsx",
+      "line": 4,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "Badge",
+      "file": "components/ui/badge.tsx",
+      "line": 16,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "variant",
+          "type": "\"default\" | \"secondary\" | \"outline\"",
+          "optional": true
+        }
+      ],
+      "variants": [
+        {
+          "prop": "variant",
+          "options": [
+            "default",
+            "outline",
+            "secondary"
+          ],
+          "defaultValue": "default"
+        }
+      ]
+    },
+    {
+      "name": "Button",
+      "file": "components/ui/button.tsx",
+      "line": 27,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "size",
+          "type": "\"default\" | \"sm\" | \"lg\" | \"icon\"",
+          "optional": true
+        },
+        {
+          "name": "variant",
+          "type": "\"link\" | \"default\" | \"secondary\" | \"outline\" | \"ghost\"",
+          "optional": true
+        }
+      ],
+      "variants": [
+        {
+          "prop": "size",
+          "options": [
+            "default",
+            "icon",
+            "lg",
+            "sm"
+          ],
+          "defaultValue": "default"
+        },
+        {
+          "prop": "variant",
+          "options": [
+            "default",
+            "ghost",
+            "link",
+            "outline",
+            "secondary"
+          ],
+          "defaultValue": "default"
+        }
+      ]
+    },
+    {
+      "name": "Card",
+      "file": "components/ui/card.tsx",
+      "line": 4,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "className",
+          "type": "unknown",
+          "optional": true
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "CardHeader",
+      "file": "components/ui/card.tsx",
+      "line": 8,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "className",
+          "type": "unknown",
+          "optional": true
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "CardTitle",
+      "file": "components/ui/card.tsx",
+      "line": 12,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "className",
+          "type": "unknown",
+          "optional": true
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "CardDescription",
+      "file": "components/ui/card.tsx",
+      "line": 16,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "className",
+          "type": "unknown",
+          "optional": true
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "CardContent",
+      "file": "components/ui/card.tsx",
+      "line": 20,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "className",
+          "type": "unknown",
+          "optional": true
+        }
+      ],
+      "variants": []
+    }
+  ],
+  "tokens": {
+    "variables": [
+      {
+        "name": "--background",
+        "value": "oklch(1 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 6,
+        "resolved": "oklch(1 0 0)"
+      },
+      {
+        "name": "--foreground",
+        "value": "oklch(0.145 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 7,
+        "resolved": "oklch(0.145 0 0)"
+      },
+      {
+        "name": "--card",
+        "value": "oklch(1 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 8,
+        "resolved": "oklch(1 0 0)"
+      },
+      {
+        "name": "--card-foreground",
+        "value": "oklch(0.145 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 9,
+        "resolved": "oklch(0.145 0 0)"
+      },
+      {
+        "name": "--primary",
+        "value": "oklch(0.488 0.243 264.376)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 10,
+        "resolved": "oklch(0.488 0.243 264.376)"
+      },
+      {
+        "name": "--primary-foreground",
+        "value": "oklch(0.985 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 11,
+        "resolved": "oklch(0.985 0 0)"
+      },
+      {
+        "name": "--secondary",
+        "value": "oklch(0.97 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 12,
+        "resolved": "oklch(0.97 0 0)"
+      },
+      {
+        "name": "--secondary-foreground",
+        "value": "oklch(0.205 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 13,
+        "resolved": "oklch(0.205 0 0)"
+      },
+      {
+        "name": "--muted",
+        "value": "oklch(0.97 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 14,
+        "resolved": "oklch(0.97 0 0)"
+      },
+      {
+        "name": "--muted-foreground",
+        "value": "oklch(0.556 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 15,
+        "resolved": "oklch(0.556 0 0)"
+      },
+      {
+        "name": "--border",
+        "value": "oklch(0.922 0 0)",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 16,
+        "resolved": "oklch(0.922 0 0)"
+      },
+      {
+        "name": "--radius",
+        "value": "0.625rem",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 17,
+        "resolved": "0.625rem"
+      },
+      {
+        "name": "--background",
+        "value": "oklch(0.145 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 21,
+        "resolved": "oklch(0.145 0 0)"
+      },
+      {
+        "name": "--foreground",
+        "value": "oklch(0.985 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 22,
+        "resolved": "oklch(0.985 0 0)"
+      },
+      {
+        "name": "--card",
+        "value": "oklch(0.205 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 23,
+        "resolved": "oklch(0.205 0 0)"
+      },
+      {
+        "name": "--card-foreground",
+        "value": "oklch(0.985 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 24,
+        "resolved": "oklch(0.985 0 0)"
+      },
+      {
+        "name": "--primary",
+        "value": "oklch(0.623 0.214 259.815)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 25,
+        "resolved": "oklch(0.623 0.214 259.815)"
+      },
+      {
+        "name": "--primary-foreground",
+        "value": "oklch(0.985 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 26,
+        "resolved": "oklch(0.985 0 0)"
+      },
+      {
+        "name": "--secondary",
+        "value": "oklch(0.269 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 27,
+        "resolved": "oklch(0.269 0 0)"
+      },
+      {
+        "name": "--secondary-foreground",
+        "value": "oklch(0.985 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 28,
+        "resolved": "oklch(0.985 0 0)"
+      },
+      {
+        "name": "--muted",
+        "value": "oklch(0.269 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 29,
+        "resolved": "oklch(0.269 0 0)"
+      },
+      {
+        "name": "--muted-foreground",
+        "value": "oklch(0.708 0 0)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 30,
+        "resolved": "oklch(0.708 0 0)"
+      },
+      {
+        "name": "--border",
+        "value": "oklch(1 0 0 / 10%)",
+        "scope": ".dark",
+        "file": "app/globals.css",
+        "line": 31,
+        "resolved": "oklch(1 0 0 / 10%)"
+      },
+      {
+        "name": "--color-background",
+        "value": "var(--background)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 35,
+        "resolved": "oklch(1 0 0)"
+      },
+      {
+        "name": "--color-foreground",
+        "value": "var(--foreground)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 36,
+        "resolved": "oklch(0.145 0 0)"
+      },
+      {
+        "name": "--color-card",
+        "value": "var(--card)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 37,
+        "resolved": "oklch(1 0 0)"
+      },
+      {
+        "name": "--color-card-foreground",
+        "value": "var(--card-foreground)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 38,
+        "resolved": "oklch(0.145 0 0)"
+      },
+      {
+        "name": "--color-primary",
+        "value": "var(--primary)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 39,
+        "resolved": "oklch(0.488 0.243 264.376)"
+      },
+      {
+        "name": "--color-primary-foreground",
+        "value": "var(--primary-foreground)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 40,
+        "resolved": "oklch(0.985 0 0)"
+      },
+      {
+        "name": "--color-secondary",
+        "value": "var(--secondary)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 41,
+        "resolved": "oklch(0.97 0 0)"
+      },
+      {
+        "name": "--color-secondary-foreground",
+        "value": "var(--secondary-foreground)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 42,
+        "resolved": "oklch(0.205 0 0)"
+      },
+      {
+        "name": "--color-muted",
+        "value": "var(--muted)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 43,
+        "resolved": "oklch(0.97 0 0)"
+      },
+      {
+        "name": "--color-muted-foreground",
+        "value": "var(--muted-foreground)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 44,
+        "resolved": "oklch(0.556 0 0)"
+      },
+      {
+        "name": "--color-border",
+        "value": "var(--border)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 45,
+        "resolved": "oklch(0.922 0 0)"
+      },
+      {
+        "name": "--radius-sm",
+        "value": "calc(var(--radius) - 4px)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 46,
+        "resolved": "calc(0.625rem - 4px)"
+      },
+      {
+        "name": "--radius-md",
+        "value": "calc(var(--radius) - 2px)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 47,
+        "resolved": "calc(0.625rem - 2px)"
+      },
+      {
+        "name": "--radius-lg",
+        "value": "var(--radius)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 48,
+        "resolved": "0.625rem"
+      },
+      {
+        "name": "--radius-xl",
+        "value": "calc(var(--radius) + 4px)",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 49,
+        "resolved": "calc(0.625rem + 4px)"
+      },
+      {
+        "name": "--font-sans",
+        "value": "ui-sans-serif, system-ui, sans-serif",
+        "scope": "@theme inline",
+        "file": "app/globals.css",
+        "line": 50,
+        "resolved": "ui-sans-serif, system-ui, sans-serif"
+      }
+    ],
+    "colors": {
+      "bg": {
+        "variable": "--background",
+        "value": "oklch(1 0 0)"
+      },
+      "bgElevated": {
+        "variable": "--card",
+        "value": "oklch(1 0 0)"
+      },
+      "fg": {
+        "variable": "--foreground",
+        "value": "oklch(0.145 0 0)"
+      },
+      "fgMuted": {
+        "variable": "--muted-foreground",
+        "value": "oklch(0.556 0 0)"
+      },
+      "accent": {
+        "variable": "--primary",
+        "value": "oklch(0.488 0.243 264.376)"
+      },
+      "accentInk": {
+        "variable": "--primary-foreground",
+        "value": "oklch(0.985 0 0)"
+      },
+      "border": {
+        "variable": "--border",
+        "value": "oklch(0.922 0 0)"
+      }
+    },
+    "fonts": {
+      "body": {
+        "variable": "--font-sans",
+        "value": "ui-sans-serif, system-ui, sans-serif"
+      }
+    },
+    "radius": {
+      "control": {
+        "variable": "--radius-md",
+        "value": "calc(0.625rem - 2px)"
+      },
+      "surface": {
+        "variable": "--radius-lg",
+        "value": "0.625rem"
+      }
+    },
+    "unresolved": [
+      "font.display",
+      "font.mono",
+      "radius.pill"
+    ]
+  },
+  "usage": {
+    "components": [
+      {
+        "component": "Button",
+        "file": "components/ui/button.tsx",
+        "line": 27,
+        "uses": 9,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 21
+          },
+          {
+            "file": "app/page.tsx",
+            "line": 22
+          },
+          {
+            "file": "app/page.tsx",
+            "line": 33
+          },
+          {
+            "file": "components/billing-toggle.tsx",
+            "line": 12
+          },
+          {
+            "file": "components/billing-toggle.tsx",
+            "line": 13
+          },
+          {
+            "file": "components/pricing-card.tsx",
+            "line": 36
+          },
+          {
+            "file": "components/site-header.tsx",
+            "line": 10
+          },
+          {
+            "file": "components/site-header.tsx",
+            "line": 11
+          },
+          {
+            "file": "components/site-header.tsx",
+            "line": 12
+          }
+        ],
+        "props": {
+          "size": {
+            "lg": 2,
+            "sm": 5
+          },
+          "variant": {
+            "outline": 1,
+            "link": 1,
+            "{expression}": 3,
+            "ghost": 2
+          },
+          "onClick": {
+            "{expression}": 2
+          }
+        }
+      },
+      {
+        "component": "Badge",
+        "file": "components/ui/badge.tsx",
+        "line": 16,
+        "uses": 2,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 15
+          },
+          {
+            "file": "components/pricing-card.tsx",
+            "line": 19
+          }
+        ],
+        "props": {
+          "variant": {
+            "secondary": 1
+          }
+        }
+      },
+      {
+        "component": "Card",
+        "file": "components/ui/card.tsx",
+        "line": 4,
+        "uses": 2,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 27
+          },
+          {
+            "file": "components/pricing-card.tsx",
+            "line": 15
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "CardContent",
+        "file": "components/ui/card.tsx",
+        "line": 20,
+        "uses": 2,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 32
+          },
+          {
+            "file": "components/pricing-card.tsx",
+            "line": 23
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "CardDescription",
+        "file": "components/ui/card.tsx",
+        "line": 16,
+        "uses": 2,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 30
+          },
+          {
+            "file": "components/pricing-card.tsx",
+            "line": 21
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "CardHeader",
+        "file": "components/ui/card.tsx",
+        "line": 8,
+        "uses": 2,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 28
+          },
+          {
+            "file": "components/pricing-card.tsx",
+            "line": 16
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "CardTitle",
+        "file": "components/ui/card.tsx",
+        "line": 12,
+        "uses": 2,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 29
+          },
+          {
+            "file": "components/pricing-card.tsx",
+            "line": 18
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "BillingToggle",
+        "file": "components/billing-toggle.tsx",
+        "line": 8,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/pricing/page.tsx",
+            "line": 15
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "PricingCard",
+        "file": "components/pricing-card.tsx",
+        "line": 13,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/pricing/page.tsx",
+            "line": 19
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "SiteHeader",
+        "file": "components/site-header.tsx",
+        "line": 4,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/layout.tsx",
+            "line": 12
+          }
+        ],
+        "props": {}
+      }
+    ],
+    "classes": {
+      "spacing": [
+        {
+          "value": "px-6",
+          "count": 5,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 13
+          }
+        },
+        {
+          "value": "mx-auto",
+          "count": 4,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 13
+          }
+        },
+        {
+          "value": "gap-2",
+          "count": 3,
+          "example": {
+            "file": "components/pricing-card.tsx",
+            "line": 30
+          }
+        },
+        {
+          "value": "gap-6",
+          "count": 3,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 25
+          }
+        },
+        {
+          "value": "py-24",
+          "count": 2,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 14
+          }
+        },
+        {
+          "value": "gap-1",
+          "count": 1,
+          "example": {
+            "file": "components/billing-toggle.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "gap-1.5",
+          "count": 1,
+          "example": {
+            "file": "components/ui/card.tsx",
+            "line": 9
+          }
+        },
+        {
+          "value": "gap-3",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 20
+          }
+        },
+        {
+          "value": "mt-12",
+          "count": 1,
+          "example": {
+            "file": "app/pricing/page.tsx",
+            "line": 17
+          }
+        },
+        {
+          "value": "mt-4",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 17
+          }
+        },
+        {
+          "value": "mt-6",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "mt-8",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 20
+          }
+        },
+        {
+          "value": "p-1",
+          "count": 1,
+          "example": {
+            "file": "components/billing-toggle.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "p-6",
+          "count": 1,
+          "example": {
+            "file": "components/ui/card.tsx",
+            "line": 9
+          }
+        },
+        {
+          "value": "pb-24",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 25
+          }
+        }
+      ],
+      "radius": [
+        {
+          "value": "rounded-full",
+          "count": 1,
+          "example": {
+            "file": "components/ui/badge.tsx",
+            "line": 5
+          }
+        },
+        {
+          "value": "rounded-lg",
+          "count": 1,
+          "example": {
+            "file": "components/billing-toggle.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "rounded-md",
+          "count": 1,
+          "example": {
+            "file": "components/ui/button.tsx",
+            "line": 6
+          }
+        },
+        {
+          "value": "rounded-xl",
+          "count": 1,
+          "example": {
+            "file": "components/ui/card.tsx",
+            "line": 5
+          }
+        }
+      ],
+      "fontSize": [
+        {
+          "value": "text-sm",
+          "count": 4,
+          "example": {
+            "file": "components/pricing-card.tsx",
+            "line": 26
+          }
+        },
+        {
+          "value": "text-lg",
+          "count": 3,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 17
+          }
+        },
+        {
+          "value": "text-xs",
+          "count": 2,
+          "example": {
+            "file": "components/ui/badge.tsx",
+            "line": 5
+          }
+        },
+        {
+          "value": "text-3xl",
+          "count": 1,
+          "example": {
+            "file": "components/pricing-card.tsx",
+            "line": 24
+          }
+        },
+        {
+          "value": "text-4xl",
+          "count": 1,
+          "example": {
+            "file": "app/pricing/page.tsx",
+            "line": 14
+          }
+        },
+        {
+          "value": "text-5xl",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 16
+          }
+        }
+      ],
+      "color": [
+        {
+          "value": "border-border",
+          "count": 5,
+          "example": {
+            "file": "components/billing-toggle.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "text-muted-foreground",
+          "count": 3,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 17
+          }
+        },
+        {
+          "value": "bg-background",
+          "count": 2,
+          "example": {
+            "file": "app/layout.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "bg-muted",
+          "count": 2,
+          "example": {
+            "file": "components/ui/button.tsx",
+            "line": 12
+          }
+        },
+        {
+          "value": "bg-primary",
+          "count": 2,
+          "example": {
+            "file": "components/ui/badge.tsx",
+            "line": 8
+          }
+        },
+        {
+          "value": "bg-secondary",
+          "count": 2,
+          "example": {
+            "file": "components/ui/badge.tsx",
+            "line": 9
+          }
+        },
+        {
+          "value": "text-foreground",
+          "count": 2,
+          "example": {
+            "file": "app/layout.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "text-primary-foreground",
+          "count": 2,
+          "example": {
+            "file": "components/ui/badge.tsx",
+            "line": 8
+          }
+        },
+        {
+          "value": "text-secondary-foreground",
+          "count": 2,
+          "example": {
+            "file": "components/ui/badge.tsx",
+            "line": 9
+          }
+        },
+        {
+          "value": "bg-card",
+          "count": 1,
+          "example": {
+            "file": "components/ui/card.tsx",
+            "line": 5
+          }
+        },
+        {
+          "value": "bg-primary/90",
+          "count": 1,
+          "example": {
+            "file": "components/ui/button.tsx",
+            "line": 10
+          }
+        },
+        {
+          "value": "bg-secondary/80",
+          "count": 1,
+          "example": {
+            "file": "components/ui/button.tsx",
+            "line": 11
+          }
+        },
+        {
+          "value": "border-primary",
+          "count": 1,
+          "example": {
+            "file": "components/pricing-card.tsx",
+            "line": 15
+          }
+        },
+        {
+          "value": "text-card-foreground",
+          "count": 1,
+          "example": {
+            "file": "components/ui/card.tsx",
+            "line": 5
+          }
+        },
+        {
+          "value": "text-primary",
+          "count": 1,
+          "example": {
+            "file": "components/ui/button.tsx",
+            "line": 14
+          }
+        }
+      ]
+    },
+    "bypasses": [],
+    "repeatedClassLists": []
+  },
+  "facts": [
+    {
+      "id": "common:fontSize",
+      "text": "text-sm is the most common font size class (4 of 12)",
+      "evidence": [
+        {
+          "file": "components/pricing-card.tsx",
+          "line": 26
+        }
+      ]
+    },
+    {
+      "id": "variant:Button:size",
+      "text": "Button uses size=\"sm\" in 5 of 9 places",
+      "evidence": [
+        {
+          "file": "app/page.tsx",
+          "line": 21
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 22
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 33
+        },
+        {
+          "file": "components/billing-toggle.tsx",
+          "line": 12
+        },
+        {
+          "file": "components/billing-toggle.tsx",
+          "line": 13
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

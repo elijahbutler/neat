@@ -1,0 +1,149 @@
+@import "tailwindcss";
+@source "../**/*.{ts,tsx}";
+
+/* Neat Labs editor theme, shared with neatlabs.design: flat surfaces, 1px ink rules, pill controls,
+   and one cobalt action per screen. */
+@theme {
+  --color-ink: #14130f;
+  --color-page: #fbfaf6;
+  --color-wash: #efece3;
+  --color-rule: #cfcabc;
+  --color-quiet: #6b665c;
+  --color-cobalt: #2f4bff;
+  --color-cobalt-deep: #1e36e0;
+  --color-tint: #dde2ff;
+  --color-mint: #cff3df;
+
+  --font-display: var(--font-instrument-serif), "Times New Roman", serif;
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-card: 6px;
+  --radius-pill: 9999px;
+}
+
+@layer base {
+  html {
+    background: var(--color-page);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: var(--color-tint);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .caption {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .panel {
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-card);
+    background: var(--color-page);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--color-cobalt);
+    color: #ffffff;
+    padding: 12px 22px;
+    font-size: 15px;
+    font-weight: 500;
+    border: 1px solid var(--color-ink);
+  }
+  .btn-primary:hover { background: var(--color-cobalt-deep); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--color-page);
+    color: var(--color-ink);
+    padding: 8px 16px;
+    font-size: 14px;
+    border: 1px solid var(--color-ink);
+  }
+  .btn-secondary:hover { background: var(--color-wash); }
+  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .field {
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-pill);
+    background: var(--color-page);
+    padding: 11px 18px;
+    font-size: 15px;
+  }
+  .field::placeholder { color: var(--color-quiet); }
+
+  /* Segmented choices: ink fill marks the selected one. */
+  .chip {
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-pill);
+    padding: 4px 12px;
+    font-size: 13px;
+    background: var(--color-page);
+  }
+  .chip:hover { background: var(--color-wash); }
+  .chip[aria-pressed='true'],
+  .chip[aria-selected='true'] {
+    background: var(--color-ink);
+    color: var(--color-page);
+  }
+
+  .code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.65;
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-card);
+    background: var(--color-wash);
+    padding: 16px;
+    overflow: auto;
+  }
+
+  .link {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .link:hover { text-decoration-color: var(--color-cobalt); text-decoration-thickness: 2px; }
+
+  /* Dot grid for drawing surfaces. */
+  .grid-canvas {
+    background-color: var(--color-page);
+    background-image: radial-gradient(var(--color-rule) 1px, transparent 1px);
+    background-size: 14px 14px;
+  }
+}

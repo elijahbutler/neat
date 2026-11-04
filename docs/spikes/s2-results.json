@@ -1,0 +1,346 @@
+[
+  {
+    "fixture": "acme-analytics",
+    "bundler": "turbopack",
+    "tagging": false,
+    "configFile": "(unchanged)",
+    "readyMs": 3353,
+    "routes": {},
+    "hmr": {
+      "ok": true,
+      "ms": 0,
+      "detail": "baseline run, not measured"
+    }
+  },
+  {
+    "fixture": "orbit-studio",
+    "bundler": "turbopack",
+    "tagging": false,
+    "configFile": "(unchanged)",
+    "readyMs": 3397,
+    "routes": {},
+    "hmr": {
+      "ok": true,
+      "ms": 0,
+      "detail": "baseline run, not measured"
+    }
+  },
+  {
+    "fixture": "messy-market",
+    "bundler": "turbopack",
+    "tagging": false,
+    "configFile": "(unchanged)",
+    "readyMs": 3346,
+    "routes": {},
+    "hmr": {
+      "ok": true,
+      "ms": 0,
+      "detail": "baseline run, not measured"
+    }
+  },
+  {
+    "fixture": "acme-analytics",
+    "bundler": "turbopack",
+    "tagging": true,
+    "configFile": "next.config.ts",
+    "readyMs": 3420,
+    "routes": {
+      "/": {
+        "elements": 35,
+        "direct": 33,
+        "inherited": 2,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 25,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 1
+        }
+      },
+      "/pricing": {
+        "elements": 62,
+        "direct": 60,
+        "inherited": 2,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 25,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 1
+        }
+      }
+    },
+    "hmr": {
+      "ok": true,
+      "ms": 95,
+      "detail": "edited text tagged app/page.tsx:16:9; expected app/page.tsx:16"
+    }
+  },
+  {
+    "fixture": "orbit-studio",
+    "bundler": "turbopack",
+    "tagging": true,
+    "configFile": "next.config.ts",
+    "readyMs": 3822,
+    "routes": {
+      "/": {
+        "elements": 40,
+        "direct": 30,
+        "inherited": 10,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 9,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 9
+        }
+      },
+      "/about": {
+        "elements": 17,
+        "direct": 12,
+        "inherited": 5,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 4,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 4
+        }
+      },
+      "/work/harbor-coffee": {
+        "elements": 16,
+        "direct": 11,
+        "inherited": 5,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 4,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 4
+        }
+      }
+    },
+    "hmr": {
+      "ok": true,
+      "ms": 100,
+      "detail": "edited text tagged app/page.tsx:10:9; expected app/page.tsx:10"
+    }
+  },
+  {
+    "fixture": "messy-market",
+    "bundler": "turbopack",
+    "tagging": true,
+    "configFile": "next.config.mjs",
+    "readyMs": 3974,
+    "routes": {
+      "/": {
+        "elements": 32,
+        "direct": 28,
+        "inherited": 4,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 3,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 3
+        }
+      },
+      "/cart": {
+        "elements": 16,
+        "direct": 12,
+        "inherited": 4,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 3,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 3
+        }
+      }
+    },
+    "hmr": {
+      "ok": true,
+      "ms": 91,
+      "detail": "edited text tagged app/page.tsx:16:7; expected app/page.tsx:16"
+    }
+  },
+  {
+    "fixture": "acme-analytics",
+    "bundler": "webpack",
+    "tagging": true,
+    "configFile": "next.config.ts",
+    "readyMs": 5002,
+    "routes": {
+      "/": {
+        "elements": 35,
+        "direct": 33,
+        "inherited": 2,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 25,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 1
+        }
+      },
+      "/pricing": {
+        "elements": 62,
+        "direct": 60,
+        "inherited": 2,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 25,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 1
+        }
+      }
+    },
+    "hmr": {
+      "ok": true,
+      "ms": 324,
+      "detail": "edited text tagged app/page.tsx:16:9; expected app/page.tsx:16"
+    }
+  },
+  {
+    "fixture": "orbit-studio",
+    "bundler": "webpack",
+    "tagging": true,
+    "configFile": "next.config.ts",
+    "readyMs": 4962,
+    "routes": {
+      "/": {
+        "elements": 40,
+        "direct": 30,
+        "inherited": 10,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 9,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 9
+        }
+      },
+      "/about": {
+        "elements": 17,
+        "direct": 12,
+        "inherited": 5,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 4,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 4
+        }
+      },
+      "/work/harbor-coffee": {
+        "elements": 16,
+        "direct": 11,
+        "inherited": 5,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 4,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 4
+        }
+      }
+    },
+    "hmr": {
+      "ok": true,
+      "ms": 301,
+      "detail": "edited text tagged app/page.tsx:10:9; expected app/page.tsx:10"
+    }
+  },
+  {
+    "fixture": "messy-market",
+    "bundler": "webpack",
+    "tagging": true,
+    "configFile": "next.config.mjs",
+    "readyMs": 5027,
+    "routes": {
+      "/": {
+        "elements": 32,
+        "direct": 28,
+        "inherited": 4,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 3,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 3
+        }
+      },
+      "/cart": {
+        "elements": 16,
+        "direct": 12,
+        "inherited": 4,
+        "untagged": 0,
+        "invalidSrc": [],
+        "instances": 3,
+        "invalidInst": [],
+        "inheritedByTag": {
+          "div": 1,
+          "a": 3
+        }
+      }
+    },
+    "hmr": {
+      "ok": true,
+      "ms": 280,
+      "detail": "edited text tagged app/page.tsx:16:7; expected app/page.tsx:16"
+    }
+  },
+  {
+    "fixture": "acme-analytics",
+    "bundler": "webpack",
+    "tagging": false,
+    "configFile": "(unchanged)",
+    "readyMs": 5178,
+    "routes": {},
+    "hmr": {
+      "ok": true,
+      "ms": 0,
+      "detail": "baseline run, not measured"
+    }
+  },
+  {
+    "fixture": "orbit-studio",
+    "bundler": "webpack",
+    "tagging": false,
+    "configFile": "(unchanged)",
+    "readyMs": 5016,
+    "routes": {},
+    "hmr": {
+      "ok": true,
+      "ms": 0,
+      "detail": "baseline run, not measured"
+    }
+  },
+  {
+    "fixture": "messy-market",
+    "bundler": "webpack",
+    "tagging": false,
+    "configFile": "(unchanged)",
+    "readyMs": 4825,
+    "routes": {},
+    "hmr": {
+      "ok": true,
+      "ms": 0,
+      "detail": "baseline run, not measured"
+    }
+  }
+]

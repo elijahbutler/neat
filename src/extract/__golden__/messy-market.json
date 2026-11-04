@@ -1,0 +1,726 @@
+{
+  "schemaVersion": 1,
+  "project": "messy-market",
+  "commit": null,
+  "framework": {
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "tailwind": "4.3.3"
+  },
+  "uiLibraries": [],
+  "components": [
+    {
+      "name": "CartPage",
+      "file": "app/cart/page.tsx",
+      "line": 6,
+      "kind": "page",
+      "exported": true,
+      "client": true,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "RootLayout",
+      "file": "app/layout.tsx",
+      "line": 4,
+      "kind": "layout",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "children",
+          "type": "React.ReactNode",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "Page",
+      "file": "app/page.tsx",
+      "line": 11,
+      "kind": "page",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "Header",
+      "file": "components/Header.tsx",
+      "line": 3,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [],
+      "variants": []
+    },
+    {
+      "name": "LegacyBanner",
+      "file": "components/legacy-banner.jsx",
+      "line": 1,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "subtitle",
+          "type": "unknown",
+          "optional": true
+        },
+        {
+          "name": "title",
+          "type": "unknown",
+          "optional": true
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "ProductCard",
+      "file": "components/product-card-old.tsx",
+      "line": 1,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "cost",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "ProductCard",
+      "file": "components/ProductCard.tsx",
+      "line": 3,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "image",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "onSale",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "optional": false
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "PromoBanner",
+      "file": "components/promo-banner.tsx",
+      "line": 1,
+      "kind": "component",
+      "exported": true,
+      "client": false,
+      "props": [
+        {
+          "name": "message",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "variants": []
+    }
+  ],
+  "tokens": {
+    "variables": [
+      {
+        "name": "--main-color",
+        "value": "#0a7d5a",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 4,
+        "resolved": "#0a7d5a"
+      },
+      {
+        "name": "--bg",
+        "value": "#ffffff",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 5,
+        "resolved": "#ffffff"
+      },
+      {
+        "name": "--text",
+        "value": "#222222",
+        "scope": ":root",
+        "file": "app/globals.css",
+        "line": 6,
+        "resolved": "#222222"
+      }
+    ],
+    "colors": {
+      "bg": {
+        "variable": "--bg",
+        "value": "#ffffff"
+      },
+      "fg": {
+        "variable": "--text",
+        "value": "#222222"
+      },
+      "accent": {
+        "variable": "--main-color",
+        "value": "#0a7d5a"
+      }
+    },
+    "fonts": {},
+    "radius": {},
+    "unresolved": [
+      "color.accentInk",
+      "color.bgElevated",
+      "color.border",
+      "color.fgMuted",
+      "font.body",
+      "font.display",
+      "font.mono",
+      "radius.control",
+      "radius.pill",
+      "radius.surface"
+    ]
+  },
+  "usage": {
+    "components": [
+      {
+        "component": "Header",
+        "file": "components/Header.tsx",
+        "line": 3,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/layout.tsx",
+            "line": 8
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "LegacyBanner",
+        "file": "components/legacy-banner.jsx",
+        "line": 1,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 15
+          }
+        ],
+        "props": {
+          "title": {
+            "Summer market": 1
+          },
+          "subtitle": {
+            "New goods every Friday": 1
+          }
+        }
+      },
+      {
+        "component": "ProductCard",
+        "file": "components/product-card-old.tsx",
+        "line": 1,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/cart/page.tsx",
+            "line": 11
+          }
+        ],
+        "props": {
+          "title": {
+            "Enamel mug": 1
+          },
+          "cost": {
+            "$18.00": 1
+          }
+        }
+      },
+      {
+        "component": "ProductCard",
+        "file": "components/ProductCard.tsx",
+        "line": 3,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 18
+          }
+        ],
+        "props": {}
+      },
+      {
+        "component": "PromoBanner",
+        "file": "components/promo-banner.tsx",
+        "line": 1,
+        "uses": 1,
+        "sites": [
+          {
+            "file": "app/page.tsx",
+            "line": 14
+          }
+        ],
+        "props": {
+          "message": {
+            "Free shipping over $50": 1
+          }
+        }
+      }
+    ],
+    "classes": {
+      "spacing": [
+        {
+          "value": "px-4",
+          "count": 4,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 21
+          }
+        },
+        {
+          "value": "py-2",
+          "count": 4,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 21
+          }
+        },
+        {
+          "value": "px-2",
+          "count": 2,
+          "example": {
+            "file": "app/cart/page.tsx",
+            "line": 13
+          }
+        },
+        {
+          "value": "gap-2",
+          "count": 1,
+          "example": {
+            "file": "app/cart/page.tsx",
+            "line": 12
+          }
+        },
+        {
+          "value": "gap-3",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 20
+          }
+        },
+        {
+          "value": "gap-6",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 17
+          }
+        },
+        {
+          "value": "mb-3",
+          "count": 1,
+          "example": {
+            "file": "components/ProductCard.tsx",
+            "line": 6
+          }
+        },
+        {
+          "value": "mb-4",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "mt-10",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 20
+          }
+        },
+        {
+          "value": "mt-2",
+          "count": 1,
+          "example": {
+            "file": "components/ProductCard.tsx",
+            "line": 9
+          }
+        },
+        {
+          "value": "mt-4",
+          "count": 1,
+          "example": {
+            "file": "app/cart/page.tsx",
+            "line": 12
+          }
+        },
+        {
+          "value": "mt-8",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "p-[13px]",
+          "count": 1,
+          "example": {
+            "file": "components/promo-banner.tsx",
+            "line": 2
+          }
+        },
+        {
+          "value": "p-4",
+          "count": 1,
+          "example": {
+            "file": "components/ProductCard.tsx",
+            "line": 5
+          }
+        },
+        {
+          "value": "p-6",
+          "count": 1,
+          "example": {
+            "file": "components/legacy-banner.jsx",
+            "line": 3
+          }
+        }
+      ],
+      "radius": [
+        {
+          "value": "rounded",
+          "count": 6,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 21
+          }
+        }
+      ],
+      "fontSize": [
+        {
+          "value": "text-[34px]",
+          "count": 1,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 16
+          }
+        },
+        {
+          "value": "text-2xl",
+          "count": 1,
+          "example": {
+            "file": "components/legacy-banner.jsx",
+            "line": 4
+          }
+        },
+        {
+          "value": "text-lg",
+          "count": 1,
+          "example": {
+            "file": "components/ProductCard.tsx",
+            "line": 7
+          }
+        },
+        {
+          "value": "text-sm",
+          "count": 1,
+          "example": {
+            "file": "components/promo-banner.tsx",
+            "line": 2
+          }
+        }
+      ],
+      "color": [
+        {
+          "value": "text-white",
+          "count": 5,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 21
+          }
+        },
+        {
+          "value": "bg-[#0a7d5a]",
+          "count": 4,
+          "example": {
+            "file": "app/page.tsx",
+            "line": 21
+          }
+        },
+        {
+          "value": "bg-[#fff4d6]",
+          "count": 1,
+          "example": {
+            "file": "components/promo-banner.tsx",
+            "line": 2
+          }
+        },
+        {
+          "value": "bg-gray-100",
+          "count": 1,
+          "example": {
+            "file": "components/ProductCard.tsx",
+            "line": 6
+          }
+        },
+        {
+          "value": "bg-green-700",
+          "count": 1,
+          "example": {
+            "file": "components/legacy-banner.jsx",
+            "line": 3
+          }
+        },
+        {
+          "value": "text-gray-700",
+          "count": 1,
+          "example": {
+            "file": "components/ProductCard.tsx",
+            "line": 8
+          }
+        },
+        {
+          "value": "text-red-600",
+          "count": 1,
+          "example": {
+            "file": "components/ProductCard.tsx",
+            "line": 8
+          }
+        }
+      ]
+    },
+    "bypasses": [
+      {
+        "kind": "inline-style",
+        "value": "{ padding: 24 }",
+        "file": "app/cart/page.tsx",
+        "line": 9
+      },
+      {
+        "kind": "inline-style",
+        "value": "{ fontSize: 28, fontWeight: 'bold' }",
+        "file": "app/cart/page.tsx",
+        "line": 10
+      },
+      {
+        "kind": "inline-style",
+        "value": "{ maxWidth: 1100, margin: '0 auto', padding: 24 }",
+        "file": "app/page.tsx",
+        "line": 13
+      },
+      {
+        "kind": "arbitrary-class",
+        "value": "text-[34px]",
+        "file": "app/page.tsx",
+        "line": 16
+      },
+      {
+        "kind": "arbitrary-class",
+        "value": "bg-[#0a7d5a]",
+        "file": "app/page.tsx",
+        "line": 21,
+        "token": "--main-color"
+      },
+      {
+        "kind": "arbitrary-class",
+        "value": "bg-[#0a7d5a]",
+        "file": "app/page.tsx",
+        "line": 22,
+        "token": "--main-color"
+      },
+      {
+        "kind": "arbitrary-class",
+        "value": "bg-[#0a7d5a]",
+        "file": "app/page.tsx",
+        "line": 23,
+        "token": "--main-color"
+      },
+      {
+        "kind": "inline-style",
+        "value": "{ display: 'flex', justifyContent: 'space-between', padding: '16px 24px', borde…",
+        "file": "components/Header.tsx",
+        "line": 5
+      },
+      {
+        "kind": "inline-style",
+        "value": "{ fontWeight: 700, color: '#0a7d5a' }",
+        "file": "components/Header.tsx",
+        "line": 6,
+        "token": "--main-color"
+      },
+      {
+        "kind": "inline-style",
+        "value": "{ display: 'flex', gap: 16 }",
+        "file": "components/Header.tsx",
+        "line": 7
+      },
+      {
+        "kind": "inline-style",
+        "value": "{ border: '1px solid #ddd', padding: 12 }",
+        "file": "components/product-card-old.tsx",
+        "line": 3
+      },
+      {
+        "kind": "arbitrary-class",
+        "value": "bg-[#0a7d5a]",
+        "file": "components/ProductCard.tsx",
+        "line": 9,
+        "token": "--main-color"
+      },
+      {
+        "kind": "arbitrary-class",
+        "value": "bg-[#fff4d6]",
+        "file": "components/promo-banner.tsx",
+        "line": 2
+      },
+      {
+        "kind": "arbitrary-class",
+        "value": "p-[13px]",
+        "file": "components/promo-banner.tsx",
+        "line": 2
+      }
+    ],
+    "repeatedClassLists": [
+      {
+        "tag": "button",
+        "classes": "bg-[#0a7d5a] px-4 py-2 rounded text-white",
+        "count": 3,
+        "examples": [
+          {
+            "file": "app/page.tsx",
+            "line": 21
+          },
+          {
+            "file": "app/page.tsx",
+            "line": 22
+          },
+          {
+            "file": "app/page.tsx",
+            "line": 23
+          }
+        ]
+      }
+    ]
+  },
+  "facts": [
+    {
+      "id": "bypass",
+      "text": "14 values bypass tokens (7 arbitrary classes, 7 inline styles), for example { padding: 24 } at app/cart/page.tsx:9",
+      "evidence": [
+        {
+          "file": "app/cart/page.tsx",
+          "line": 9
+        },
+        {
+          "file": "app/cart/page.tsx",
+          "line": 10
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 13
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 16
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "common:radius",
+      "text": "rounded is the most common radius class (6 of 6)",
+      "evidence": [
+        {
+          "file": "app/page.tsx",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "duplicate:ProductCard",
+      "text": "ProductCard is defined in 2 files",
+      "evidence": [
+        {
+          "file": "components/product-card-old.tsx",
+          "line": 1
+        },
+        {
+          "file": "components/ProductCard.tsx",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "id": "repeated:button:bg-[#0a7d5a] px-4 py-2 rounded text-white",
+      "text": "<button> repeats the class list \"bg-[#0a7d5a] px-4 py-2 rounded text-white\" 3 times; this may be a missing component",
+      "evidence": [
+        {
+          "file": "app/page.tsx",
+          "line": 21
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 22
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "token:--main-color",
+      "text": "5 hardcoded values equal --main-color, for example bg-[#0a7d5a]; use the token instead",
+      "evidence": [
+        {
+          "file": "app/page.tsx",
+          "line": 21
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 22
+        },
+        {
+          "file": "app/page.tsx",
+          "line": 23
+        },
+        {
+          "file": "components/Header.tsx",
+          "line": 6
+        },
+        {
+          "file": "components/ProductCard.tsx",
+          "line": 9
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}
