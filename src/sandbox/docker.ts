@@ -24,8 +24,21 @@ export interface SandboxInfo {
 export type SandboxState = 'starting' | 'ready' | 'stopped' | 'failed';
 
 /** What a sandbox backend has to do. The docker one runs on this Mac now and on the sandbox server later. */
+export interface SandboxStartOptions {
+  editorOrigin: string;
+  /** Check out this commit instead of the repository's HEAD. Providers that can't (Docker copies the working tree) ignore it. */
+  baseCommit?: string;
+  /**
+   * Runs once the working copy and its preview additions are ready and before the preview process starts, so kept
+   * changes can be put back. `root` is the repository root of the working copy and `appDir` the app inside it.
+   */
+  restore?: (dirs: { root: string; appDir: string }) => Promise<void>;
+}
+
 export interface SandboxProvider {
-  start(id: string, repo: string, opts: { editorOrigin: string }): Promise<SandboxInfo>;
+  /** Whether the working copy is a worktree of the user's repository at a known commit, so a pass can be rebuilt on it. */
+  readonly durable?: boolean;
+  start(id: string, repo: string, opts: SandboxStartOptions): Promise<SandboxInfo>;
   state(info: SandboxInfo): Promise<SandboxState>;
   logs(info: SandboxInfo, lines?: number): Promise<string>;
   stop(info: SandboxInfo): Promise<void>;

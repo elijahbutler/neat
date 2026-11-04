@@ -5,19 +5,37 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { PanelOptions } from '../../edit/classes';
 import type { EditOperation } from '../../edit/operations';
 import type { StyleSource } from '../../edit/properties';
-import { textEditTracker, textOperation } from './direct';
+import { moveTarget, patchLines, targetTags, textEditTracker, textOperation, type SelectedTarget } from './direct';
 import { PropertyPanel } from './PropertyPanel';
 
 interface FileChange { file: string; before: string; after: string }
+interface Check { name: 'syntax' | 'typecheck' | 'imports' | 'variants' | 'lint' | 'render'; status: 'passed' | 'not-run' }
+interface Step {
+  id: string;
+  number: number;
+  source: 'ask' | 'direct';
+  summary: string;
+  files: string[];
+  status: 'kept' | 'undone';
+  patch: string;
+  checks: Check[];
+  commit: string | null;
+  /** The newest step still in the history. Undoing it leaves no trace. */
+  latest: boolean;
+}
 interface Session {
   id: string;
   fixture: string;
   state: 'starting' | 'ready' | 'stopped' | 'failed';
   previewUrl: string;
-  pending: { kind: 'ask' | 'direct'; instruction: string; changes: FileChange[] } | null;
-  history: Array<{ instruction: string; files: string[]; commit: string }>;
+  pending: { kind: 'ask' | 'direct'; instruction: string; changes: FileChange[]; checks: Check[] } | null;
+  timeline: Step[];
+  /** What a restart found: steps put back, saved files skipped, and the first step that could not come back. */
+  recovery: { restored: number; skipped: number; failure: { summary: string; reason: string } | null } | null;
 }
-interface Target { src: string | null; inst: string | null; element: string; text: string; ancestors: Array<{ src: string | null; inst: string | null; childIndex: number }> }
+/** Keep and Undo answer with the session plus where the tags the page holds now point (null when they can't be followed). */
+type Settled = Session & { nextTag: string | null; moved: Record<string, string | null> };
+type Target = SelectedTarget;
 /** The worker's answer to a double-click: edit this source tag, or a message saying where the text lives. */
 type TextAnswer = { editable: true; target: string } | { editable: false; message: string };
 interface Inspection {
@@ -80,7 +98,12 @@ export function EditorApp() {
   const [width, setWidth] = useState<Width>('desktop');
   const [selecting, setSelecting] = useState(true);
   const [route, setRoute] = useState('/');
-  const [target, setTarget] = useState<Target | null>(null);
+  const [target, setTargetState] = useState<Target | null>(null);
+  // Callbacks that outlive a render read the selection from here, so they always follow the newest tags.
+  const targetRef = useRef<Target | null>(null);
+  const setTarget = useCallback((next: Target | null) => { targetRef.current = next; setTargetState(next); }, []);
+  const [recoveryShown, setRecoveryShown] = useState(true);
+  const [undoing, setUndoing] = useState<string | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [instruction, setInstruction] = useState('');
   const [asking, setAsking] = useState(false);
@@ -135,14 +158,17 @@ export function EditorApp() {
     if (!session) return false;
     setEditing(true);
     try {
-      const res = await api<{ ok: boolean; session?: Session; message?: string }>(`sessions/${session.id}/edit`, { body: { tag, operations, label } });
+      const held = targetRef.current;
+      const res = await api<{ ok: boolean; session?: Session; message?: string; moved?: Record<string, string | null> }>(`sessions/${session.id}/edit`, { body: { tag, operations, label, tags: held ? targetTags(held) : [] } });
       if (!res.ok || !res.session) { setNotice(res.message ?? "That change couldn't be made."); return false; }
-      // The selection stays, so the panel is back on the same element once the change is kept or undone.
+      // The change can move lines and columns. The selection follows its element, so the panel is back on the same
+      // element once the change is kept or undone, and the next tweak targets the right place.
+      if (held && res.moved) setTarget(moveTarget(held, res.moved));
       setNotice(null); setSession(res.session);
       return true;
     } catch (e) { setNotice((e as Error).message); return false; }
     finally { setEditing(false); }
-  }, [session]);
+  }, [session, setTarget]);
 
   useEffect(() => {
     if (!session) return;
@@ -198,7 +224,7 @@ export function EditorApp() {
   useEffect(() => { post({ type: 'neat:mode', selecting }); }, [selecting, post]);
 
   async function start() {
-    setError(null); setLogs(null); setTarget(null); setInspection(null); setNotice(null);
+    setError(null); setLogs(null); setTarget(null); setInspection(null); setNotice(null); setRecoveryShown(true);
     try { setSession(await api<Session>('sessions', { body: { fixture } })); }
     catch (e) { setError((e as Error).message); }
   }
@@ -224,17 +250,45 @@ export function EditorApp() {
     finally { setAsking(false); setStarted(null); }
   }
 
+  /** Reselect the element after a change, at the tag it now has. Without one the selection is cleared. */
+  function followSelection(held: Target | null, moved: Record<string, string | null> | undefined) {
+    const next = held && moved ? moveTarget(held, moved) : null;
+    const tag = next && (next.inst ?? next.src);
+    if (!next || !tag) {
+      setInspection(null); setTarget(null); post({ type: 'neat:clear' });
+      if (held) setNotice("The element you had selected moved and couldn't be followed. Click it again.");
+      return;
+    }
+    setTarget(next);
+    post({ type: 'neat:reselect', tag });
+    void inspect(tag, route, next.ancestors);
+  }
+
   async function settle(action: 'keep' | 'undo') {
     if (!session) return;
-    const tag = target?.inst ?? target?.src;
-    const direct = session.pending?.kind === 'direct' && target && tag;
+    const held = targetRef.current;
+    const direct = session.pending?.kind === 'direct' && held;
     try {
-      setSession(await api<Session>(`sessions/${session.id}/${action}`, { body: {} }));
+      const done = await api<Settled>(`sessions/${session.id}/${action}`, { body: { tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
+      setSession(done);
       // After a direct edit the same element stays selected, read again so the controls show the code as it is now.
-      if (direct) { post({ type: 'neat:reselect', tag }); void inspect(tag, route, target.ancestors); }
+      if (direct) followSelection(held, done.moved);
       else { setInspection(null); setTarget(null); post({ type: 'neat:clear' }); }
     }
     catch (e) { setAskError((e as Error).message); }
+  }
+
+  /** Take one kept step back. The server says no when later steps depend on it, and the notice says why. */
+  async function undoStep(step: Step) {
+    if (!session || undoing) return;
+    const held = targetRef.current;
+    setUndoing(step.id); setNotice(null);
+    try {
+      const done = await api<Settled>(`sessions/${session.id}/undo`, { body: { step: step.id, tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
+      setSession(done);
+      if (held) followSelection(held, done.moved);
+    } catch (e) { setNotice((e as Error).message); }
+    finally { setUndoing(null); }
   }
 
   const frameWidth = WIDTHS[width];
@@ -318,6 +372,7 @@ export function EditorApp() {
 
           <aside className="flex w-[380px] shrink-0 flex-col border-l border-ink" aria-label="Inspector">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+              {session.recovery && recoveryShown && <RecoveryNotice recovery={session.recovery} onDismiss={() => setRecoveryShown(false)} />}
               {notice && <p role="status" className="rounded-[6px] border border-rule bg-wash p-3 text-[13px] leading-snug">{notice}</p>}
               {session.pending ? (
                 <PendingChange session={session} onSettle={settle} />
@@ -326,16 +381,7 @@ export function EditorApp() {
               ) : (
                 <p className="text-[15px] text-quiet">{session.state === 'ready' ? 'Click anything on the page to see which component and line it comes from. Double-click text to edit it.' : 'The inspector fills in once the preview is running.'}</p>
               )}
-              {session.history.length > 0 && (
-                <section className="space-y-2">
-                  <h2 className="caption text-quiet">Kept on the session branch</h2>
-                  <ul className="space-y-1.5 text-[13px]">
-                    {session.history.map((h) => (
-                      <li key={h.commit} className="flex gap-2"><span className="font-mono text-quiet">{h.commit}</span><span>{h.instruction}</span></li>
-                    ))}
-                  </ul>
-                </section>
-              )}
+              {session.timeline.length > 0 && <Timeline steps={session.timeline} busy={undoing !== null || !!session.pending} undoing={undoing} onUndo={undoStep} />}
             </div>
 
             <form onSubmit={ask} className="space-y-2 border-t border-ink p-4">
@@ -458,6 +504,71 @@ function PendingChange({ session, onSettle }: { session: Session; onSettle: (act
         <button type="button" className="btn-secondary" onClick={() => onSettle('undo')}><Undo2 size={14} /> Undo</button>
       </div>
       <p className="caption flex items-center gap-1.5 text-quiet"><X size={11} /> Not committed until you keep it</p>
+      {pending.checks.length > 0 && <p className="text-[12px] leading-snug text-quiet">{checkSummary(pending.checks)}</p>}
+    </section>
+  );
+}
+
+/** What was checked and what was not. A check the editor has not run is never listed as a pass. */
+function checkSummary(checks: Check[]): string {
+  const names = (status: Check['status']) => checks.filter((c) => c.status === status).map((c) => c.name).join(', ');
+  const passed = names('passed');
+  const skipped = names('not-run');
+  return [passed && `Checked: ${passed}.`, skipped && `Not run yet: ${skipped}.`].filter(Boolean).join(' ');
+}
+
+function RecoveryNotice({ recovery, onDismiss }: { recovery: NonNullable<Session['recovery']>; onDismiss: () => void }) {
+  const lines: string[] = [];
+  if (recovery.failure?.reason === 'base-missing') lines.push('A saved pass was left alone because the commit it started from is no longer in this repository. This session starts a new pass.');
+  else if (recovery.failure) {
+    const why = recovery.failure.reason === 'changed' || recovery.failure.reason === 'conflict' ? 'the code it changed is different now' : 'it could not be applied safely';
+    lines.push(`Restored ${recovery.restored} kept ${recovery.restored === 1 ? 'step' : 'steps'}. "${recovery.failure.summary}" could not be put back because ${why}, so it and the steps after it were left out. The saved pass is still on disk.`);
+  }
+  else if (recovery.restored > 0) lines.push(`Restored ${recovery.restored} kept ${recovery.restored === 1 ? 'step' : 'steps'} from your last pass.`);
+  if (recovery.skipped > 0) lines.push(`${recovery.skipped} saved pass ${recovery.skipped === 1 ? 'file' : 'files'} could not be read and ${recovery.skipped === 1 ? 'was' : 'were'} skipped.`);
+  if (!lines.length) return null;
+  return (
+    <div role="status" className="flex items-start gap-2 rounded-[6px] border border-rule bg-wash p-3 text-[13px] leading-snug">
+      <div className="flex-1 space-y-1">{lines.map((line) => <p key={line}>{line}</p>)}</div>
+      <button type="button" className="shrink-0 rounded-full p-0.5 text-quiet hover:text-ink" aria-label="Dismiss" onClick={onDismiss}><X size={14} /></button>
+    </div>
+  );
+}
+
+function Timeline({ steps, busy, undoing, onUndo }: { steps: Step[]; busy: boolean; undoing: string | null; onUndo: (step: Step) => void }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="caption text-quiet">Kept steps</h2>
+      {steps.length > 1 && <p className="text-[12px] leading-snug text-quiet">Undo on the newest step removes it. Undo on an earlier step adds a step that reverses it and keeps the work after it. If a later step changed the same lines, nothing is changed and the editor says so.</p>}
+      <ol className="space-y-3" aria-label="Kept steps">
+        {steps.map((step) => (
+          <li key={step.id} className="space-y-1.5 border-b border-rule pb-3 last:border-b-0">
+            <div className="flex items-start gap-2">
+              <span className="w-4 shrink-0 pt-px font-mono text-[12px] text-quiet">{step.number}</span>
+              <div className="min-w-0 flex-1">
+                <p className={step.status === 'undone' ? 'text-[13px] text-quiet line-through' : 'text-[13px]'}>{step.summary}</p>
+                <p className="caption truncate text-quiet" title={step.files.join(', ')}>{step.status === 'kept' ? 'Kept' : 'Undone'} · {step.files.join(', ')}{step.commit ? ` · ${step.commit}` : ''}</p>
+              </div>
+              {step.status === 'kept' && (
+                <button type="button" className="btn-secondary shrink-0 !px-3 !py-1 !text-[12px]" disabled={busy} aria-label={`Undo step ${step.number}: ${step.summary}`} onClick={() => onUndo(step)}>
+                  {undoing === step.id ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />} Undo
+                </button>
+              )}
+            </div>
+            <details className="pl-6">
+              <summary className="caption cursor-pointer text-quiet">Code and checks</summary>
+              <pre className="code mt-2 !p-0 !text-[11.5px]">
+                {patchLines(step.patch).map((l, i) => (
+                  <div key={i} className={l.kind === '+' ? 'bg-mint px-3' : l.kind === '-' ? 'bg-red-100 px-3 text-quiet line-through' : l.kind === 'hunk' ? 'bg-wash px-3 text-quiet' : 'px-3'}>
+                    <span className="inline-block w-3 select-none">{l.kind === 'hunk' ? '' : l.kind}</span>{l.text}
+                  </div>
+                ))}
+              </pre>
+              {step.checks.length > 0 && <p className="mt-2 text-[12px] leading-snug text-quiet">{checkSummary(step.checks)}</p>}
+            </details>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

@@ -63,7 +63,7 @@ export async function sandboxWriteTarget(rootDir: string, target: string): Promi
 
 
 /** Replace the destination itself. Never open it for a write, even if it becomes a symlink. */
-export async function sandboxWrite(rootDir: string, target: string, contents: string): Promise<void> {
+export async function sandboxWrite(rootDir: string, target: string, contents: string, mode = 0o600): Promise<void> {
   const path = await sandboxWriteTarget(rootDir, target);
   const parent = dirname(path);
   const directory = await open(parent, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
@@ -75,7 +75,7 @@ export async function sandboxWrite(rootDir: string, target: string, contents: st
     const checked = await lstat(parent);
     if (await realpath(parent) !== parent || checked.ino !== identity.ino || checked.dev !== identity.dev) throw new Error('Sandbox parent directory changed');
     const file = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-    try { await file.writeFile(contents); } finally { await file.close(); }
+    try { await file.writeFile(contents); await file.chmod(mode); } finally { await file.close(); }
     const current = await realpath(parent);
     const currentInfo = await lstat(parent);
     if (current !== parent || currentInfo.ino !== identity.ino || currentInfo.dev !== identity.dev) throw new Error('Sandbox parent directory changed');

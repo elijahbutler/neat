@@ -38,3 +38,47 @@ export function textOperation(target: string, typed: string): EditOperation | nu
   const text = typed.replace(/\s+/g, ' ').trim();
   return text ? { op: 'set-text', target, text } : null;
 }
+
+/** The element selected on the page, as the preview reported it: source tags for itself, its instance, and its ancestors. */
+export interface SelectedTarget {
+  src: string | null;
+  inst: string | null;
+  element: string;
+  text: string;
+  ancestors: Array<{ src: string | null; inst: string | null; childIndex: number }>;
+}
+
+/** Every source tag the selection holds, for the worker to follow across a change. */
+export function targetTags(target: SelectedTarget): string[] {
+  return [...new Set([target.src, target.inst, ...target.ancestors.flatMap((a) => [a.src, a.inst])].filter((tag): tag is string => !!tag))];
+}
+
+/**
+ * The selection after a change moved lines and columns. `moved` maps each tag the worker was given to its new tag, or
+ * null when it could not be followed. Returns null when the selected element itself is lost, so the page can ask for a
+ * new click instead of pointing at the wrong code. An ancestor that is lost only stops being used.
+ */
+export function moveTarget(target: SelectedTarget, moved: Record<string, string | null>): SelectedTarget | null {
+  const follow = (tag: string | null) => (tag === null ? null : tag in moved ? moved[tag] ?? null : tag);
+  const next = { ...target, src: follow(target.src), inst: follow(target.inst), ancestors: target.ancestors.map((a) => ({ ...a, src: follow(a.src), inst: follow(a.inst) })) };
+  // The instance is what edits target when there is one, so losing it loses the selection.
+  const lost = target.inst !== null ? next.inst === null : target.src !== null && next.src === null;
+  return lost ? null : next;
+}
+
+export interface PatchLine { kind: 'hunk' | '+' | '-' | ' '; text: string }
+
+/** The lines of a step's unified diff worth showing: hunk headers, additions, removals, and context. */
+export function patchLines(patch: string): PatchLine[] {
+  const lines: PatchLine[] = [];
+  let inHunk = false;
+  for (const line of patch.split('\n')) {
+    if (line.startsWith('diff --git ')) { inHunk = false; continue; }
+    if (line.startsWith('@@')) { inHunk = true; lines.push({ kind: 'hunk', text: line.replace(/^(@@[^@]*@@).*$/, '$1') }); continue; }
+    if (!inHunk) continue;
+    if (line.startsWith('+')) lines.push({ kind: '+', text: line.slice(1) });
+    else if (line.startsWith('-')) lines.push({ kind: '-', text: line.slice(1) });
+    else if (line.startsWith(' ')) lines.push({ kind: ' ', text: line.slice(1) });
+  }
+  return lines;
+}

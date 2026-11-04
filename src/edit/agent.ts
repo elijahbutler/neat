@@ -4,10 +4,12 @@ import type { Project } from 'ts-morph';
 import { z } from 'zod';
 import type { CatalogueReference } from '../catalogue/client';
 import { checkEdit } from './check';
+import { checkStatuses, type CheckStatus } from './direct';
 import { buildContext, resolveSelection, type RepoIndex } from './index';
 import { applyEdits, editOperationsSchema, type EditError, type FileChange } from './operations';
 import { MODEL_SETUP_NOTE, type EditClient } from './model';
 import { confirmations, type ScopeConfirmation } from './scope';
+import type { FileSpan } from './shift';
 
 export const EDIT_SYSTEM = `You edit a Next.js App Router codebase that uses Tailwind, on behalf of someone using a visual design editor. They clicked an element on the running page and asked for a change.
 
@@ -77,6 +79,11 @@ export type EditOutcome = EditResult & (
 interface EditResult {
   /** Validated, checked changes; null when every attempt failed. */
   changes: FileChange[] | null;
+  /** The replaced ranges and the request's tag after them, for the accepted changes. Empty and null otherwise. */
+  spans: FileSpan[];
+  nextTag: string | null;
+  /** What was checked on the accepted changes, and what was not run. Empty when there are none. */
+  checks: CheckStatus[];
   attempts: number;
   /** One entry per failed attempt, as sent back to the model. */
   errors: string[];
@@ -92,7 +99,7 @@ export const editFeedback = (errors: EditError[]) => errors.map((e) => `operatio
 export async function proposeEdit(req: EditRequest): Promise<EditOutcome> {
   const usage: EditUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, calls: 0 };
   req.signal?.throwIfAborted();
-  if (!req.client) return { status: 'no-model', note: MODEL_SETUP_NOTE, changes: null, attempts: 0, errors: [], confirm: [], usage };
+  if (!req.client) return { status: 'no-model', note: MODEL_SETUP_NOTE, changes: null, spans: [], nextTag: null, checks: [], attempts: 0, errors: [], confirm: [], usage };
   const maxTotalTokens = req.maxTotalTokens ?? 64000;
   const maxAttempts = req.maxAttempts ?? 3;
   if (!Number.isSafeInteger(maxTotalTokens) || maxTotalTokens < 1 || !Number.isSafeInteger(maxAttempts) || maxAttempts < 1) {
@@ -140,15 +147,15 @@ export async function proposeEdit(req: EditRequest): Promise<EditOutcome> {
       feedback = editFeedback(applied.errors);
       errors.push(feedback);
       if (confirm.length > 0) {
-        return { changes: null, attempts: attempt, errors, confirm, usage };
+        return { changes: null, spans: [], nextTag: null, checks: [], attempts: attempt, errors, confirm, usage };
       }
     } else {
       const check = checkEdit(req.project, req.root, req.index, applied.changes);
-      if (check.ok) return { changes: applied.changes, attempts: attempt, errors, confirm: [], usage };
+      if (check.ok) return { changes: applied.changes, spans: applied.spans, nextTag: applied.nextTag, checks: checkStatuses(check), attempts: attempt, errors, confirm: [], usage };
       feedback = check.errors.map((e) => `${e.check} ${e.file}:${e.line}: ${e.message}`).join('\n');
       errors.push(feedback);
     }
     messages.push({ role: 'user', content: `That didn't work:\n${feedback}\n\nTry again.` });
   }
-  return { changes: null, attempts: maxAttempts, errors, confirm, usage };
+  return { changes: null, spans: [], nextTag: null, checks: [], attempts: maxAttempts, errors, confirm, usage };
 }
