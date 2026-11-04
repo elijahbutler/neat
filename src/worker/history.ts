@@ -4,7 +4,7 @@ import type { CheckStatus } from '../edit/direct';
 import type { FileChange } from '../edit/operations';
 import type { FileSpan } from '../edit/shift';
 import {
-  commitFiles, dropHeadCommit, headCommit, headText, previewPatch, readApp, Refusal, repoPath, requireState, stage, stagedPatch, unstage, writeApp,
+  commitFiles, dropHeadCommit, headCommit, headText, previewPatch, readApp, Refusal, repoPath, requireState, snapshotPatch, stage, stagedPatch, unstage, writeApp,
   type Worktree,
 } from './git';
 import { isReplayable, newId, now, sha256, type EditEntry, type Entry, type Pass, type StepFile } from './passes';
@@ -59,9 +59,7 @@ export async function keepStep(h: History, input: KeepInput): Promise<EditEntry>
       throw new Refusal(409, 'changed', `${change.file} differs from the last kept step. Undo this change and restart the editor to rebuild it from your kept steps.`);
     }
   }
-  await stage(h.wt, names);
-  let patch: string;
-  try { patch = await stagedPatch(h.wt, names); } catch (error) { await unstage(h.wt, names); throw error; }
+  const patch = await snapshotPatch(h.wt, input.changes);
   const summary = oneLine(input.summary);
   const entry: EditEntry = {
     kind: 'edit', source: input.source, tag: input.tag.slice(0, 1000), id: newId('step'), summary: summary || 'Edit', createdAt: now(),

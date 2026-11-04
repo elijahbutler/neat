@@ -71,7 +71,7 @@ export async function readApp(wt: Worktree, file: string): Promise<string | null
 
 /** The file's text in the current commit, or null when the commit does not have it. */
 export async function headText(wt: Worktree, file: string): Promise<string | null> {
-  const result = await git(wt.root, ['show', `HEAD:${repoPath(wt, file)}`]);
+  const result = await git(wt.root, ['cat-file', '--filters', `HEAD:${repoPath(wt, file)}`]);
   return result.code === 0 ? result.out : null;
 }
 
@@ -125,6 +125,24 @@ export async function unstage(wt: Worktree, files: string[]): Promise<void> {
 export async function stagedPatch(wt: Worktree, files: string[]): Promise<string> {
   return gitText(wt.root, ['diff', '--cached', '--binary', '--full-index', '--no-renames', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', '--', ...files.map((file) => repoPath(wt, file))]);
 }
+/** Build a patch from validated text using an isolated index, without staging working files. */
+export async function snapshotPatch(wt: Worktree, changes: Array<{ file: string; after: string }>): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'neat-snapshot-'));
+  const env = { GIT_INDEX_FILE: join(dir, 'index') };
+  try {
+    await gitText(wt.root, ['read-tree', 'HEAD'], { env });
+    for (const change of changes) {
+      const path = repoPath(wt, change.file);
+      const entry = await gitText(wt.root, ['ls-files', '--stage', '--', path], { env });
+      const mode = /^(100644|100755) /.exec(entry)?.[1];
+      if (!mode) throw new Refusal(409, 'unsafe', 'Only existing regular files can be kept.');
+      const blob = (await gitText(wt.root, ['hash-object', '-w', '--path', path, '--stdin'], { input: change.after })).trim();
+      await gitText(wt.root, ['update-index', '--cacheinfo', mode, blob, path], { env });
+    }
+    return await gitText(wt.root, ['diff', '--cached', '--binary', '--full-index', '--no-renames', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', '--', ...changes.map(c => repoPath(wt, c.file))], { env });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+}
+
 /** Commit the recorded patch through a private index. Plumbing commands do not run repository hooks or reread disk. */
 export async function commitFiles(wt: Worktree, message: string, files: string[], patch: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'neat-commit-'));
@@ -170,7 +188,7 @@ export async function previewPatch(wt: Worktree, patch: string, options: { rever
     const applied = await git(wt.root, ['apply', '--cached', '--whitespace=nowarn', ...(options.reverse ? ['-R', '--3way'] : [])], { input: patch, env });
     if (applied.code !== 0) throw new Refusal(409, 'conflict', 'Later steps change the same code, so this step cannot be taken back on its own. Undo the later steps first.');
     const texts = new Map<string, string>();
-    for (const path of named) texts.set(path, await gitText(wt.root, ['show', `:${path}`], { env }));
+    for (const path of named) texts.set(path, await gitText(wt.root, ['cat-file', '--filters', `:${path}`], { env }));
     return texts;
   } finally { await rm(dir, { recursive: true, force: true }); }
 }

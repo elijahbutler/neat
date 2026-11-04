@@ -124,3 +124,27 @@ test('permissions never follow a destination symlink swapped on replacement', as
     expect(await readFile(outside, 'utf8')).toBe('private\n');
   } finally { watcher.close(); }
 });
+
+test('snapshot patches use validated text even if the working file changes first', async () => {
+  const { root, wt } = await repo({ 'app/page.tsx': 'base\n' });
+  const { snapshotPatch, commitFiles } = await import('./git');
+  await writeFile(join(root, 'app/page.tsx'), 'external\n');
+  const patch = await snapshotPatch(wt, [{ file: 'app/page.tsx', after: 'validated\n' }]);
+  await commitFiles(wt, 'Keep validated text', ['app/page.tsx'], patch);
+  expect(await $`git show HEAD:app/page.tsx`.cwd(root).quiet().text()).toBe('validated\n');
+  expect(await readFile(join(root, 'app/page.tsx'), 'utf8')).toBe('external\n');
+});
+
+test('CRLF files compare and replay in checkout representation', async () => {
+  const { root, wt } = await repo({ 'app/page.tsx': 'base\n', '.gitattributes': '*.tsx text eol=crlf\n' });
+  const { headText, snapshotPatch, commitFiles } = await import('./git');
+  await rm(join(root, 'app/page.tsx'));
+  await $`git checkout-index --force --all`.cwd(root).quiet();
+  expect(await readFile(join(root, 'app/page.tsx'), 'utf8')).toBe('base\r\n');
+  expect(await headText(wt, 'app/page.tsx')).toBe('base\r\n');
+  await requireState(wt, [{ file: 'app/page.tsx', hash: sha256('base\r\n') }]);
+  const patch = await snapshotPatch(wt, [{ file: 'app/page.tsx', after: 'kept\r\n' }]);
+  expect((await previewPatch(wt, patch, { reverse: false, repoFiles: ['app/page.tsx'] })).get('app/page.tsx')).toBe('kept\r\n');
+  await commitFiles(wt, 'Keep CRLF text', ['app/page.tsx'], patch);
+  expect(await headText(wt, 'app/page.tsx')).toBe('kept\r\n');
+});
