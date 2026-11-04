@@ -24,7 +24,11 @@ import { commitExists, git, gitText, openWorktree, readApp, Refusal, requireStat
 import { chainHeads, entriesBefore, keepStep, replayPass, timeline, undoStep, type History } from './history';
 import { describeImpact, proposalView, ProposalStore, snapshotHash, type Proposal } from './confirmation';
 import { exclusive, SessionBusyError, type Lockable } from './lock';
-import { createPass, latestOpenPass, loadPasses, sha256, writePass, type Pass } from './passes';
+import { createPass, isReplayable, latestOpenPass, loadPasses, sha256, writePass, type Pass } from './passes';
+import {
+  deliverBranch, DeliveryError, exportSeries, githubState, isExportName, openPullRequest, pullRequestText, readBases, readExport, runGithub, slugify,
+  type DeliveredBranch, type DeliveryView, type ExportedPatch, type GithubRunner, type OpenedPullRequest,
+} from './delivery';
 
 export interface WorkerOptions { repo: string; app?: string; port?: number; docker?: boolean }
 export function createWorker(options: WorkerOptions & {
@@ -33,6 +37,8 @@ export function createWorker(options: WorkerOptions & {
   editClient?: EditClient | null;
   /** Lifetime and clock for saved confirmations. Tests use these to expire a proposal. */
   confirmation?: { ttlMs?: number; now?: () => number };
+  /** Test seams for delivery: the GitHub command runner, the folder for temporary worktrees, and a hook before a branch is installed. */
+  delivery?: { github?: GithubRunner; tempRoot?: string; beforeInstall?: () => Promise<void> };
 }) {
 const { provider } = options;
 const EDITOR_ORIGIN = options.origin;
@@ -66,6 +72,14 @@ interface Session extends Lockable {
   /** The pass and the worktree it lives in. Set at start for durable providers and on first use otherwise. */
   history?: History;
   recovery?: Recovery;
+  /** What this session has delivered. Kept in memory: the branch and patch files themselves are the durable record. */
+  delivery?: DeliveryState;
+}
+/** The newest branch, every patch file, and the pull request for that branch. `key` names the steps the branch was built from. */
+interface DeliveryState {
+  branch?: DeliveredBranch & { at: string; key: string };
+  exports: Array<ExportedPatch & { at: string }>;
+  pr?: OpenedPullRequest;
 }
 
 const sessions = new Map<string, Session>();
@@ -87,6 +101,21 @@ function view(s: Session) {
     timeline: s.history ? timeline(s.history) : [],
     pass: s.history && { id: s.history.pass.id, base: s.history.pass.baseCommit.slice(0, 7), durable: provider.durable === true },
     recovery: s.recovery ?? null,
+    delivery: deliveryView(s),
+  };
+}
+
+/** The steps a pass still holds, as one string: a branch built from a different string is older than the pass. */
+const seriesKey = (h: History) => h.pass.entries.filter(isReplayable).map((entry) => entry.id).join(',');
+
+function deliveryView(s: Session): DeliveryView | null {
+  const d = s.delivery;
+  if (!d) return null;
+  const key = s.history ? seriesKey(s.history) : '';
+  return {
+    branch: d.branch ? { name: d.branch.branch, requested: d.branch.requested, commit: d.branch.commit, root: d.branch.root, commits: d.branch.commits, files: d.branch.files, at: d.branch.at, stale: d.branch.key !== key } : null,
+    exports: d.exports,
+    pr: d.pr ?? null,
   };
 }
 
@@ -411,6 +440,87 @@ async function planPass(fresh: boolean) {
   };
 }
 
+/** Everything a delivery needs from the session, or the reason it cannot go ahead. */
+function deliverySource(s: Session, h: History) {
+  if (s.pending) throw new DeliveryError('PENDING_CHANGE');
+  if (s.proposals.peek()) throw new DeliveryError('PENDING_PROPOSAL');
+  const expectedCommits: string[] = [];
+  for (const entry of h.pass.entries.filter(isReplayable)) {
+    const commit = h.commits.get(entry.id);
+    if (!commit) throw new DeliveryError('SESSION_CHANGED');
+    expectedCommits.push(commit);
+  }
+  return { repo: options.repo, sandboxRoot: h.wt.root, baseCommit: h.pass.baseCommit, expectedCommits };
+}
+
+/** The slug the person typed, cleaned up, or one drawn from the first kept step. */
+function deliverySlug(h: History, requested: unknown): string {
+  const typed = typeof requested === 'string' ? slugify(requested) : '';
+  if (typed) return typed;
+  const first = h.pass.entries.find((entry) => entry.kind === 'edit' && isReplayable(entry));
+  return slugify(first?.summary ?? '') || slugify(h.pass.id);
+}
+
+const github = options.delivery?.github ?? runGithub;
+
+/** Branch, patch, and pull request delivery for one session. Only the last of these ever pushes or calls GitHub. */
+async function deliveryRoute(s: Session, method: string, rest: string[], body: Record<string, unknown>): Promise<Response> {
+  const [what, name] = rest;
+  if (method === 'GET' && !what) {
+    const h = s.history;
+    const branch = s.delivery?.branch;
+    return json({
+      delivery: deliveryView(s),
+      suggestedSlug: h ? deliverySlug(h, undefined) : '',
+      bases: h ? await readBases(options.repo, h.pass.baseCommit) : null,
+      github: branch && !s.delivery?.pr ? await githubState(github, options.repo) : null,
+    });
+  }
+  if (method === 'GET' && what === 'exports' && name) {
+    if (!isExportName(name) || !s.delivery?.exports.some((file) => file.name === name)) throw new DeliveryError('EXPORT_MISSING');
+    return new Response(await readExport(name), {
+      headers: {
+        'content-type': 'text/x-patch',
+        'content-disposition': `attachment; filename="${name}"`,
+        'x-content-type-options': 'nosniff',
+        'cache-control': 'no-store',
+      },
+    });
+  }
+  if (method !== 'POST' || rest.length !== 1) return fail(404, 'Not found.');
+  return exclusive(s, async () => {
+    const h = await ensureHistory(s);
+    const state = (s.delivery ??= { exports: [] });
+    if (what === 'branch') {
+      if (body.base !== undefined && body.base !== 'pass' && body.base !== 'head') return fail(400, 'Unknown base choice.');
+      const delivered = await deliverBranch(deliverySource(s, h), {
+        slug: deliverySlug(h, body.slug), base: body.base === 'head' ? 'head' : 'pass', tempRoot: options.delivery?.tempRoot, beforeInstall: options.delivery?.beforeInstall,
+      });
+      state.branch = { ...delivered, at: new Date().toISOString(), key: seriesKey(h) };
+      state.pr = undefined;
+      return json({ ok: true, delivery: deliveryView(s) }, 201);
+    }
+    if (what === 'export') {
+      const exported = await exportSeries(deliverySource(s, h), { slug: deliverySlug(h, body.slug) });
+      state.exports.push({ ...exported, at: new Date().toISOString() });
+      return json({ ok: true, delivery: deliveryView(s), file: exported.name }, 201);
+    }
+    if (what === 'pr') {
+      const branch = state.branch;
+      if (!branch) throw new DeliveryError('NO_DELIVERY');
+      if (s.pending) throw new DeliveryError('PENDING_CHANGE');
+      if (s.proposals.peek()) throw new DeliveryError('PENDING_PROPOSAL');
+      if (branch.key !== seriesKey(h)) throw new DeliveryError('BRANCH_CHANGED');
+      if (body.baseBranch !== undefined && typeof body.baseBranch !== 'string') throw new DeliveryError('BASE_UNKNOWN');
+      const summaries = h.pass.entries.filter((entry) => entry.kind === 'edit' && !entry.undone).map((entry) => entry.summary);
+      const text = pullRequestText(summaries.length ? summaries : [branch.requested]);
+      state.pr = await openPullRequest({ repo: options.repo, branch: branch.branch, commit: branch.commit, baseBranch: body.baseBranch, ...text }, github);
+      return json({ ok: true, delivery: deliveryView(s) }, 201);
+    }
+    return fail(404, 'Not found.');
+  });
+}
+
 async function handle(req: Request): Promise<Response> {
   if (req.headers.get('origin') && req.headers.get('origin') !== EDITOR_ORIGIN) return fail(403, 'Wrong editor origin.');
   if (req.headers.get('sec-fetch-site') === 'cross-site') return fail(403, 'Cross-site request refused.');
@@ -467,6 +577,14 @@ async function handle(req: Request): Promise<Response> {
     return new Response(response.body, { status: response.status, headers });
   }
   if (action === 'logs') return json({ logs: await provider.logs(s.info, 120) });
+  if (action === 'delivery') {
+    try { return await deliveryRoute(s, req.method, parts.slice(3), body); }
+    catch (error) {
+      if (error instanceof SessionBusyError) return fail(409, error.message);
+      if (error instanceof DeliveryError) return json({ error: error.message, code: error.code }, error.status);
+      throw error;
+    }
+  }
   if (s.state !== 'ready') return fail(409, 'The preview is still starting.');
 
   if (action === 'library') {
