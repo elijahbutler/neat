@@ -36,7 +36,36 @@ export type DirectEditResult =
     errors: EditError[];
     checks: CheckError[];
     confirm: ScopeConfirmation[];
+    /**
+     * Set when the only thing in the way is a shared component the person can confirm, and the operations pass every
+     * check once it is allowed. These are the exact operations to replay after the confirmation.
+     */
+    confirmable?: { operations: EditOperation[]; summary: string };
   };
+
+export type ReplayResult =
+  | { ok: true; changes: FileChange[]; spans: FileSpan[]; nextTag: string | null; checks: CheckStatus[] }
+  | { ok: false; errors: EditError[]; checks: CheckError[]; feedback: string };
+
+/**
+ * Apply saved operations against the code as it is now, with the given scope, and run the checks. Nothing is written.
+ * A confirmed replay uses this with the confirmed allow entries and no others.
+ */
+export function replayEdit(project: Project, root: string, index: RepoIndex, request: { tag: string; operations: unknown; allow?: string[] }): ReplayResult {
+  const applied = applyEdits(project, root, index, request.operations, { selection: request.tag, allow: request.allow });
+  if (!applied.ok) return { ok: false, errors: applied.errors, checks: [], feedback: editFeedback(applied.errors) };
+  const changes = applied.changes.filter((change) => change.before !== change.after);
+  if (!changes.length) return { ok: false, errors: [], checks: [], feedback: 'Nothing changed. The code already says that.' };
+  const check = checkEdit(project, root, index, changes);
+  if (!check.ok) return { ok: false, errors: [], checks: check.errors, feedback: check.errors.map((e) => `${e.check} ${e.file}:${e.line}: ${e.message}`).join('\n') };
+  return { ok: true, changes, spans: applied.spans, nextTag: applied.nextTag, checks: checkStatuses(check) };
+}
+
+/** One line per applier error, as the model reads it. */
+export const editFeedback = (errors: EditError[]) => errors.map((e) => `operation ${e.op} (${e.code}): ${e.message}`).join('\n');
+
+/** Whether every error is a shared-component confirmation, so allowing those components would clear all of them. */
+export const onlyConfirmations = (errors: EditError[]) => errors.length > 0 && errors.every((e) => e.code === 'needs-confirmation' && e.confirm);
 
 const quote = (text: string) => `"${text.length > 60 ? `${text.slice(0, 57)}...` : text}"`;
 
@@ -59,7 +88,7 @@ function failure(errors: EditError[], checks: CheckError[]): DirectEditResult {
   const confirm = confirmations(errors);
   const codes = new Set(errors.map((e) => e.code));
   let message = "That change couldn't be made. Click the element again and retry.";
-  if (confirm[0]) message = `That would change ${confirm[0].component} everywhere it is used (${confirm[0].uses} ${confirm[0].uses === 1 ? 'place' : 'places'}). The editor can't confirm changes to shared components yet.`;
+  if (confirm[0]) message = `That would change ${confirm[0].component} everywhere it is used (${confirm[0].uses} ${confirm[0].uses === 1 ? 'place' : 'places'}). Confirm it to go ahead.`;
   else if (codes.has('out-of-scope')) message = 'That change reaches outside the selected element, so it was not made.';
   else if (codes.has('target-not-found')) message = 'That element is no longer in the code. Click it again.';
   else if (codes.has('not-plain-text')) message = "This text isn't written directly in the code here, so it can't be edited on the page.";
@@ -84,7 +113,16 @@ export function directEdit(project: Project, root: string, index: RepoIndex, req
     if (refused.length) return failure(refused, []);
   }
   const applied = applyEdits(project, root, index, request.operations, { selection: request.tag, allow: request.allow });
-  if (!applied.ok || !parsed.success) return failure(applied.errors, []);
+  if (!applied.ok || !parsed.success) {
+    const refusal = failure(applied.errors, []);
+    if (!parsed.success || !onlyConfirmations(applied.errors) || refusal.ok) return refusal;
+    // Try the change as if confirmed, so a person is only asked about a change that would otherwise go through.
+    const preview = replayEdit(project, root, index, { tag: request.tag, operations: parsed.data, allow: refusal.confirm.map((c) => c.allow) });
+    if (preview.ok) return { ...refusal, confirmable: { operations: parsed.data, summary: request.label?.trim().slice(0, 120) || summarize(parsed.data) } };
+    // Allowing the component isn't enough: say what actually stops the change, such as text that isn't plain.
+    if (preview.errors.length) return failure(preview.errors, []);
+    return { ...refusal, message: `Changing ${refusal.confirm[0]!.component} that way would break the code, so it was not made.`, confirm: [], checks: preview.checks };
+  }
   const changes = applied.changes.filter((change) => change.before !== change.after);
   if (!changes.length) return { ok: false, message: 'Nothing changed. The code already says that.', errors: [], checks: [], confirm: [] };
   const check = checkEdit(project, root, index, changes);

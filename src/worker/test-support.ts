@@ -8,6 +8,8 @@ import { prepareWorktree, removeWorktree } from '../sandbox/worktree';
 import type { SandboxInfo, SandboxProvider } from '../sandbox/docker';
 import { prepareTaggedProject } from '../tagging/inject';
 import type { TimelineStep } from './history';
+import type { EditClient } from '../edit/model';
+import type { ProposalView } from './confirmation';
 import { createWorker } from './server';
 
 export const ORIGIN = 'http://127.0.0.1:44317';
@@ -39,6 +41,11 @@ export interface ApiBody {
   recovery?: { restored: number; skipped: number; failure: { summary: string; reason: string } | null } | null;
   pass?: { id: string; base: string; durable: boolean };
   session?: ApiBody;
+  proposal?: ProposalView | null;
+  confirm?: Array<{ allow: string; component: string; file: string; line: number; uses: number }>;
+  errors?: string[];
+  cancelled?: boolean;
+  usage?: { calls: number };
 }
 
 /** A session as the worker lists it. */
@@ -101,8 +108,8 @@ export function worktreeProvider(t: TestRepo): SandboxProvider & { dirs: Map<str
   };
 }
 
-export function startWorker(t: TestRepo, provider: SandboxProvider) {
-  const worker = createWorker({ repo: t.repo, app: t.app === '.' ? undefined : t.app, origin: ORIGIN, shell: new Map(), provider });
+export function startWorker(t: TestRepo, provider: SandboxProvider, extra: { editClient?: EditClient | null; confirmation?: { ttlMs?: number; now?: () => number } } = {}) {
+  const worker = createWorker({ repo: t.repo, app: t.app === '.' ? undefined : t.app, origin: ORIGIN, shell: new Map(), provider, ...extra });
   const call = async (path: string, method = 'GET', body?: unknown) => {
     const res = await worker.fetch(new Request(ORIGIN + path, { method, headers: { host: '127.0.0.1:44317' }, body: body === undefined ? undefined : JSON.stringify(body) }));
     return { status: res.status, body: (await res.json()) as ApiBody };

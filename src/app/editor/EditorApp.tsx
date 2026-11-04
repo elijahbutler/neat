@@ -3,6 +3,7 @@
 import { Check, Loader2, Monitor, MousePointer2, Smartphone, Square, Tablet, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { PanelOptions } from '../../edit/classes';
+import type { ProposalView } from '../../worker/confirmation';
 import type { EditOperation } from '../../edit/operations';
 import type { StyleSource } from '../../edit/properties';
 import { moveTarget, patchLines, targetTags, textEditTracker, textOperation, type SelectedTarget } from './direct';
@@ -30,6 +31,8 @@ interface Session {
   previewUrl: string;
   pending: { kind: 'ask' | 'direct'; instruction: string; changes: FileChange[]; checks: Check[] } | null;
   timeline: Step[];
+  /** A shared-component change waiting for the person to confirm or cancel it. */
+  proposal: ProposalView | null;
   /** What a restart found: steps put back, saved files skipped, and the first step that could not come back. */
   recovery: { restored: number; skipped: number; failure: { summary: string; reason: string } | null } | null;
 }
@@ -65,7 +68,7 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
     body: init?.body ? JSON.stringify(init.body) : undefined,
   });
   const data = (await res.json()) as T & { error?: string };
-  if (!res.ok && data.error) throw new Error(data.error);
+  if (!res.ok && data.error) throw Object.assign(new Error(data.error), { code: (data as { code?: string }).code });
   return data;
 }
 
@@ -108,6 +111,10 @@ export function EditorApp() {
   const [instruction, setInstruction] = useState('');
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
+  // The shared-component change waiting for a decision, whether it is being confirmed, and why the last try failed.
+  const [proposal, setProposal] = useState<ProposalView | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
   // What a direct edit did or why it didn't happen. Shown above the inspector.
   const [notice, setNotice] = useState<string | null>(null);
   // The page element being typed in (`key`, as the preview knows it) and the source tag its text is written at.
@@ -121,7 +128,7 @@ export function EditorApp() {
     api<{ fixtures: string[]; model: string; modelReady: boolean; modelSetupNote: string }>('fixtures')
       .then((d) => { setFixtures(d.fixtures); setFixture(d.fixtures[0] ?? ''); setModel({ name: d.model, ready: d.modelReady, setupNote: d.modelSetupNote }); })
       .catch((e: Error) => setError(e.message));
-    api<{ sessions: Session[] }>('sessions').then(d => { if (d.sessions[0]) setSession(d.sessions[0]); }).catch((e: Error) => setError(e.message));
+    api<{ sessions: Session[] }>('sessions').then(d => { if (d.sessions[0]) { setSession(d.sessions[0]); setProposal(d.sessions[0].proposal); } }).catch((e: Error) => setError(e.message));
   }, []);
 
   // Poll while the sandbox installs and boots.
@@ -159,12 +166,13 @@ export function EditorApp() {
     setEditing(true);
     try {
       const held = targetRef.current;
-      const res = await api<{ ok: boolean; session?: Session; message?: string; moved?: Record<string, string | null> }>(`sessions/${session.id}/edit`, { body: { tag, operations, label, tags: held ? targetTags(held) : [] } });
+      const res = await api<{ ok: boolean; session?: Session; message?: string; moved?: Record<string, string | null>; proposal?: ProposalView | null }>(`sessions/${session.id}/edit`, { body: { tag, operations, label, tags: held ? targetTags(held) : [] } });
+      if (res.proposal) { setProposal(res.proposal); setProposalError(null); setNotice(null); return false; }
       if (!res.ok || !res.session) { setNotice(res.message ?? "That change couldn't be made."); return false; }
       // The change can move lines and columns. The selection follows its element, so the panel is back on the same
       // element once the change is kept or undone, and the next tweak targets the right place.
       if (held && res.moved) setTarget(moveTarget(held, res.moved));
-      setNotice(null); setSession(res.session);
+      setNotice(null); setSession(res.session); setProposal(res.session.proposal);
       return true;
     } catch (e) { setNotice((e as Error).message); return false; }
     finally { setEditing(false); }
@@ -180,6 +188,7 @@ export function EditorApp() {
         const key = t.inst ?? t.src;
         if (!key) return;
         if (session.pending) { setNotice('Keep or undo the last change first.'); return; }
+        if (proposal) { setNotice('Confirm or cancel the shared change first.'); return; }
         // A second double-click can land before this one is answered. Answers to anything but the newest are dropped.
         const ticket = textEdit.ask();
         api<TextAnswer>(`sessions/${session.id}/text`, { body: { tag: key, route: e.data.route, ancestors: t.ancestors } })
@@ -219,7 +228,7 @@ export function EditorApp() {
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [session, selecting, inspect, post, directEdit, textEdit]);
+  }, [session, selecting, inspect, post, directEdit, textEdit, proposal]);
 
   useEffect(() => { post({ type: 'neat:mode', selecting }); }, [selecting, post]);
 
@@ -237,17 +246,52 @@ export function EditorApp() {
 
   async function ask(e: FormEvent) {
     e.preventDefault();
-    if (!session || !inspection || !instruction.trim() || asking) return;
-    setAsking(true); setAskError(null); setStarted(Date.now());
+    if (!session || !inspection || !instruction.trim() || asking || proposal) return;
+    const held = targetRef.current;
+    setAsking(true); setAskError(null); setProposalError(null); setStarted(Date.now());
     try {
-      const res = await api<{ ok: boolean; session?: Session; errors?: string[]; confirm?: Array<{ component: string; uses: number }> }>(`sessions/${session.id}/ask`, { body: { tag: inspection.instance?.tag ?? inspection.tag, route, instruction } });
-      const shared = res.confirm?.[0];
-      // The worker refuses changes to a shared component until someone confirms them. That step isn't built yet.
-      if (shared) setAskError(`That would change ${shared.component} everywhere it is used (${shared.uses} ${shared.uses === 1 ? 'place' : 'places'}). The editor can't confirm changes to shared components yet. Ask for a change to this element only.`);
+      const res = await api<{ ok: boolean; session?: Session; errors?: string[]; confirm?: Array<{ component: string; uses: number }>; proposal?: ProposalView | null; moved?: Record<string, string | null> }>(`sessions/${session.id}/ask`, { body: { tag: inspection.instance?.tag ?? inspection.tag, route, instruction, tags: held ? targetTags(held) : [] } });
+      if (res.proposal) setProposal(res.proposal);
+      else if (res.confirm?.length) setAskError(`That change needs ${res.confirm[0]!.component}, which is shared, along with other parts outside this element. Ask for a change to this element only.`);
       else if (!res.ok || !res.session) setAskError(`Couldn't make that change. ${res.errors?.at(-1) ?? ''}`);
-      else { setSession(res.session); setInstruction(''); post({ type: 'neat:clear' }); }
+      else {
+        setSession(res.session); setProposal(res.session.proposal); setInstruction('');
+        // The element stays selected, at the tag it has now, the way it does after a direct edit.
+        followSelection(held, res.moved);
+      }
     } catch (err) { setAskError((err as Error).message); }
     finally { setAsking(false); setStarted(null); }
+  }
+
+  /** Make the saved change. The worker replays what it saved, so the model is not asked again. */
+  async function confirmShared() {
+    if (!session || !proposal || confirming) return;
+    const held = targetRef.current;
+    setConfirming(true); setProposalError(null);
+    try {
+      const res = await api<{ ok: boolean; session?: Session; message?: string; errors?: string[]; moved?: Record<string, string | null> }>(`sessions/${session.id}/confirm`, { body: { proposalId: proposal.id, allowSharedComponent: true, tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
+      if (!res.ok || !res.session) { setProposal(null); setAskError(res.message ?? `Couldn't make that change. ${res.errors?.at(-1) ?? ''}`); return; }
+      const kind = proposal.kind;
+      setSession(res.session); setProposal(null); setNotice(null);
+      if (kind === 'ask') setInstruction('');
+      followSelection(held, res.moved);
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      // A proposal that timed out, went stale, or is gone can't be confirmed again. Anything else can be retried.
+      if (code === 'STALE_PROPOSAL' || code === 'EXPIRED_PROPOSAL' || code === 'UNKNOWN_PROPOSAL') { setProposal(null); setAskError((err as Error).message); }
+      else setProposalError((err as Error).message);
+    } finally { setConfirming(false); }
+  }
+
+  /** Drop the saved change. Nothing was written, so there is nothing to undo. */
+  async function cancelShared() {
+    if (!session || !proposal || confirming) return;
+    setConfirming(true); setProposalError(null);
+    try {
+      await api(`sessions/${session.id}/cancel`, { body: { proposalId: proposal.id } });
+      setProposal(null);
+    } catch (err) { setProposalError((err as Error).message); }
+    finally { setConfirming(false); }
   }
 
   /** Reselect the element after a change, at the tag it now has. Without one the selection is cleared. */
@@ -267,12 +311,11 @@ export function EditorApp() {
   async function settle(action: 'keep' | 'undo') {
     if (!session) return;
     const held = targetRef.current;
-    const direct = session.pending?.kind === 'direct' && held;
     try {
       const done = await api<Settled>(`sessions/${session.id}/${action}`, { body: { tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
       setSession(done);
-      // After a direct edit the same element stays selected, read again so the controls show the code as it is now.
-      if (direct) followSelection(held, done.moved);
+      // The same element stays selected, read again so the controls show the code as it is now.
+      if (held) followSelection(held, done.moved);
       else { setInspection(null); setTarget(null); post({ type: 'neat:clear' }); }
     }
     catch (e) { setAskError((e as Error).message); }
@@ -376,12 +419,14 @@ export function EditorApp() {
               {notice && <p role="status" className="rounded-[6px] border border-rule bg-wash p-3 text-[13px] leading-snug">{notice}</p>}
               {session.pending ? (
                 <PendingChange session={session} onSettle={settle} />
+              ) : proposal ? (
+                <ConfirmShared proposal={proposal} busy={confirming} error={proposalError} onConfirm={confirmShared} onCancel={cancelShared} />
               ) : inspection ? (
                 <InspectorPanel inspection={inspection} target={target} busy={editing} onEdit={(operations, label) => { if (inspection.style) void directEdit(inspection.style.target, operations, label); }} />
               ) : (
                 <p className="text-[15px] text-quiet">{session.state === 'ready' ? 'Click anything on the page to see which component and line it comes from. Double-click text to edit it.' : 'The inspector fills in once the preview is running.'}</p>
               )}
-              {session.timeline.length > 0 && <Timeline steps={session.timeline} busy={undoing !== null || !!session.pending} undoing={undoing} onUndo={undoStep} />}
+              {session.timeline.length > 0 && <Timeline steps={session.timeline} busy={undoing !== null || !!session.pending || !!proposal || confirming} undoing={undoing} onUndo={undoStep} />}
             </div>
 
             <form onSubmit={ask} className="space-y-2 border-t border-ink p-4">
@@ -394,15 +439,15 @@ export function EditorApp() {
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
-                disabled={!inspection || asking || !!session.pending}
-                placeholder={session.pending ? 'Keep or undo the last change first.' : 'Make this the main call to action…'}
+                disabled={!inspection || asking || !!session.pending || !!proposal}
+                placeholder={session.pending ? 'Keep or undo the last change first.' : proposal ? 'Confirm or cancel the shared change first.' : 'Make this the main call to action…'}
                 className="w-full resize-none rounded-[8px] border border-ink bg-page p-3 text-[14px] placeholder:text-quiet disabled:bg-wash"
               />
               <div className="flex items-center justify-between gap-3">
                 <span className="caption text-quiet" aria-live="polite">
                   {asking && started ? `Working · ${((now - started) / 1000).toFixed(1)} s` : model ? model.name : ''}
                 </span>
-                <button type="submit" className="btn-primary !px-4 !py-2 !text-[14px]" disabled={!inspection || asking || !instruction.trim() || !!session.pending}>
+                <button type="submit" className="btn-primary !px-4 !py-2 !text-[14px]" disabled={!inspection || asking || !instruction.trim() || !!session.pending || !!proposal}>
                   {asking ? <Loader2 size={14} className="animate-spin" /> : null} Ask
                 </button>
               </div>
@@ -472,6 +517,55 @@ function InspectorPanel({ inspection, target, busy, onEdit }: { inspection: Insp
         </div>
       </details>
     </>
+  );
+}
+
+/** The routes and call sites a shared change reaches, and the choice to go ahead or not. Nothing is written until confirmed. */
+function ConfirmShared({ proposal, busy, error, onConfirm, onCancel }: { proposal: ProposalView; busy: boolean; error: string | null; onConfirm: () => void; onCancel: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, [proposal.id]);
+  const names = proposal.components.map((c) => c.component).join(' and ');
+  const places = (n: number) => `${n} ${n === 1 ? 'place' : 'places'}`;
+  return (
+    <section
+      aria-labelledby="shared-title"
+      aria-describedby="shared-summary"
+      aria-busy={busy}
+      onKeyDown={(e) => { if (e.key === 'Escape' && !busy) onCancel(); }}
+      className="space-y-4"
+    >
+      <div className="space-y-1">
+        <h2 id="shared-title" ref={heading} tabIndex={-1} className="text-[15px] font-medium outline-offset-4">Change {names} everywhere it is used?</h2>
+        <p id="shared-summary" className="text-[13px] leading-snug text-quiet">&ldquo;{proposal.instruction}&rdquo; edits the shared code, so every use below changes. Nothing is written until you confirm.</p>
+      </div>
+      {proposal.components.map((c) => (
+        <div key={c.allow} className="space-y-2">
+          <p className="font-mono text-[13px]">&lt;{c.component}&gt; <span className="text-quiet">{c.file}:{c.line} · used in {places(c.uses)}</span></p>
+          <div>
+            <p className="caption text-quiet">{c.routes.length === 1 ? 'Shown on 1 route' : `Shown on ${c.routes.length} routes`}</p>
+            {c.routes.length > 0 && (
+              <ul className="mt-1 space-y-0.5 text-[13px]">
+                {c.routes.map((route) => <li key={route.page}><span className="font-mono">{route.pattern}</span> <span className="text-quiet">{route.page}</span></li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="caption text-quiet">Rendered at</p>
+            <ul tabIndex={0} aria-label={`Places ${c.component} is rendered`} className="mt-1 max-h-32 space-y-0.5 overflow-y-auto font-mono text-[12px]">
+              {c.sites.map((site) => <li key={`${site.file}:${site.line}`}>{site.file}:{site.line}</li>)}
+            </ul>
+            {c.moreSites > 0 && <p className="text-[12px] text-quiet">and {places(c.moreSites)} more</p>}
+          </div>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <button type="button" className="btn-primary !px-4 !py-2 !text-[14px]" disabled={busy} onClick={onConfirm}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Change everywhere
+        </button>
+        <button type="button" className="btn-secondary" disabled={busy} onClick={onCancel}>Cancel</button>
+      </div>
+      {error && <p role="alert" className="text-[13px] leading-snug text-red-700">{error}</p>}
+    </section>
   );
 }
 

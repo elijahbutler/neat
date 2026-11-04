@@ -1,5 +1,5 @@
 // Standalone loopback editor server. The local path never loads the hosted Next app or auth providers.
-import { createEditClient, resolveEditModel, MODEL_SETUP_NOTE } from '../edit/model';
+import { createEditClient, resolveEditModel, MODEL_SETUP_NOTE, type EditClient } from '../edit/model';
 import { buildShell } from './shell';
 import { allocatePort, createWorktreeProvider, reclaimSessions } from '../sandbox/worktree';
 import type { SandboxProvider } from '../sandbox/docker';
@@ -11,7 +11,7 @@ import { buildLibrary } from '../catalogue/library';
 import { proposeEdit } from '../edit/agent';
 import { panelOptions } from '../edit/classes';
 import { checkEdit } from '../edit/check';
-import { directEdit, type CheckStatus } from '../edit/direct';
+import { directEdit, replayEdit, type CheckStatus } from '../edit/direct';
 import { buildRepoIndex, findJsxAt, loadEditProject, resolveSelection, type RepoIndex } from '../edit/index';
 import type { FileChange } from '../edit/operations';
 import { invertSpans, relocateTag, tagFile, type FileSpan } from '../edit/shift';
@@ -22,15 +22,22 @@ import { projectPath } from '../extract/project';
 import { dockerProvider, type SandboxInfo, type SandboxState } from '../sandbox/docker';
 import { commitExists, git, gitText, openWorktree, readApp, Refusal, requireState, writeApp } from './git';
 import { chainHeads, entriesBefore, keepStep, replayPass, timeline, undoStep, type History } from './history';
+import { describeImpact, proposalView, ProposalStore, snapshotHash, type Proposal } from './confirmation';
 import { exclusive, SessionBusyError, type Lockable } from './lock';
 import { createPass, latestOpenPass, loadPasses, sha256, writePass, type Pass } from './passes';
 
 export interface WorkerOptions { repo: string; app?: string; port?: number; docker?: boolean }
-export function createWorker(options: WorkerOptions & { origin: string; shell: Map<string, { body: string | Blob; type: string }>; provider: SandboxProvider }) {
+export function createWorker(options: WorkerOptions & {
+  origin: string; shell: Map<string, { body: string | Blob; type: string }>; provider: SandboxProvider;
+  /** Stands in for the model client, so tests and browser checks can script an Ask without a key. `null` means no model. */
+  editClient?: EditClient | null;
+  /** Lifetime and clock for saved confirmations. Tests use these to expire a proposal. */
+  confirmation?: { ttlMs?: number; now?: () => number };
+}) {
 const { provider } = options;
 const EDITOR_ORIGIN = options.origin;
 const config = resolveEditModel();
-const MODEL = config?.model ?? 'No model configured';
+const MODEL = config?.model ?? (options.editClient ? 'Injected model' : 'No model configured');
 const FIXTURES = [options.repo];
 /** `direct` changes come from a control in the editor, `ask` changes from the model. Both wait for Keep or Undo. */
 interface Pending {
@@ -54,6 +61,8 @@ interface Session extends Lockable {
   project?: Project;
   index?: RepoIndex;
   pending?: Pending;
+  /** The wide change waiting for a person's confirmation, if any. Cleared by every change to the code. */
+  proposals: ProposalStore;
   /** The pass and the worktree it lives in. Set at start for durable providers and on first use otherwise. */
   history?: History;
   recovery?: Recovery;
@@ -63,7 +72,7 @@ const sessions = new Map<string, Session>();
 let starting: Promise<Session> | undefined;
 let closing = false;
 const catalogue = createCatalogueClient();
-const client = config ? createEditClient(config) : null;
+const client = options.editClient !== undefined ? options.editClient : config ? createEditClient(config) : null;
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, message: string) => json({ error: message }, status);
@@ -74,6 +83,7 @@ function view(s: Session) {
     pending: s.pending
       ? { kind: s.pending.kind, instruction: s.pending.instruction, changes: s.pending.changes, checks: s.pending.checks, reference: s.pending.reference && { id: s.pending.reference.id, revision: s.pending.reference.revision, catalogueVersion: s.pending.reference.catalogueVersion } }
       : null,
+    proposal: (() => { const saved = s.proposals.peek(); return saved ? proposalView(saved) : null; })(),
     timeline: s.history ? timeline(s.history) : [],
     pass: s.history && { id: s.history.pass.id, base: s.history.pass.baseCommit.slice(0, 7), durable: provider.durable === true },
     recovery: s.recovery ?? null,
@@ -104,12 +114,13 @@ function forgetProject(s: Session) { s.project = undefined; s.index = undefined;
 
 /** Files changed behind the editor's back make the loaded project stale. Read the code again before computing an edit. */
 async function syncProject(s: Session, h: History) {
-  const status = await git(h.wt.root, ['status', '--porcelain', '-uno', '-z']);
-  if (status.code !== 0 || status.out) forgetProject(s);
+  // New pages can change component sharing without modifying a tracked file. Always rebuild from disk.
+  forgetProject(s);
 }
 
 /** Put the change's `after` text on disk. Refused unless the files are exactly what the change was computed from. */
 async function applyChanges(s: Session, h: History, changes: FileChange[]) {
+  s.proposals.clear();
   const heads = chainHeads(h.pass);
   try {
     await requireState(h.wt, changes.map((c) => ({ file: c.file, hash: sha256(c.before) })));
@@ -123,6 +134,7 @@ async function applyChanges(s: Session, h: History, changes: FileChange[]) {
 
 /** Put the pending change back. Refused when a file no longer holds what the change wrote. */
 async function revertPending(s: Session, h: History, pending: Pending) {
+  s.proposals.clear();
   try {
     await requireState(h.wt, pending.changes.map((c) => ({ file: c.file, hash: sha256(c.after) })), false);
     await writeApp(h.wt, pending.changes.map((c) => ({ file: c.file, text: c.before })));
@@ -222,8 +234,48 @@ const strings = (value: unknown) => (Array.isArray(value) ? value.filter((entry)
 const tagList = (body: Record<string, unknown>) => [...new Set([typeof body.tag === 'string' ? body.tag : '', ...strings(body.tags)].filter((tag) => tag && tag.length <= 1000))].slice(0, 64);
 const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim();
 
-/** Ask, direct edits, keep, and undo, run one at a time per session. */
-async function change(s: Session, action: 'ask' | 'edit' | 'keep' | 'undo', body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
+/**
+ * Make a saved shared-component change. The saved operations are replayed against the code as it is now, with only the
+ * components that proposal needed allowed. The model is not called again. The proposal is spent either way.
+ */
+async function confirmProposal(s: Session, h: History, body: Record<string, unknown>): Promise<Response> {
+  if (body.allowSharedComponent !== true) return fail(400, 'Confirming needs allowSharedComponent: true.');
+  if (typeof body.proposalId !== 'string' || !body.proposalId) return fail(400, 'Say which proposal to confirm.');
+  if (s.pending) return fail(409, 'Keep or undo the last change first.');
+  await syncProject(s, h);
+  // Re-read every source file, including newly added files that git status -uno does not report.
+  forgetProject(s);
+  const index = s.index ?? refresh(s);
+  const taken = s.proposals.take(body.proposalId, snapshotHash(s.project!, s.info.dir, h.wt.root));
+  if (!taken.ok) {
+    const reasons = {
+      unknown: [404, 'UNKNOWN_PROPOSAL', 'That confirmation is no longer waiting. Ask for the change again.'],
+      expired: [409, 'EXPIRED_PROPOSAL', 'That confirmation timed out. Ask for the change again.'],
+      stale: [409, 'STALE_PROPOSAL', 'The code changed after that change was proposed. Ask for it again.'],
+    } as const;
+    const [status, code, message] = reasons[taken.reason];
+    return json({ error: message, code }, status);
+  }
+  const proposal: Proposal = taken.proposal;
+  const allow = proposal.confirm.map((c) => c.allow);
+  const operations = [...proposal.operations];
+  let outcome: { changes: FileChange[]; spans: FileSpan[]; nextTag: string | null; checks: CheckStatus[]; summary: string };
+  if (proposal.kind === 'direct') {
+    const result = directEdit(s.project!, s.info.dir, index, { tag: proposal.tag, operations, allow, label: proposal.label });
+    if (!result.ok) { const { confirmable: _confirmable, ...refusal } = result; return json({ ...refusal, proposal: null }, 422); }
+    outcome = result;
+  } else {
+    const result = replayEdit(s.project!, s.info.dir, index, { tag: proposal.tag, operations, allow });
+    if (!result.ok) return json({ ok: false, errors: [result.feedback], confirm: [], proposal: null }, 422);
+    outcome = { ...result, summary: proposal.instruction };
+  }
+  await applyChanges(s, h, outcome.changes);
+  s.pending = { kind: proposal.kind, instruction: outcome.summary, tag: proposal.tag, changes: outcome.changes, reference: proposal.reference, spans: outcome.spans, checks: outcome.checks };
+  return json({ ok: true, session: view(s), nextTag: outcome.nextTag, moved: moveTags(tagList(body), outcome.changes, outcome.spans, 'forward') });
+}
+
+/** Ask, direct edits, confirmations, keep, and undo, run one at a time per session. */
+async function change(s: Session, action: 'ask' | 'edit' | 'confirm' | 'cancel' | 'keep' | 'undo', body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
   const h = await ensureHistory(s);
   if (action === 'edit') {
     // The direct-edit path: operations from a control, applied with the same scope and checks as an Ask, no model.
@@ -232,8 +284,16 @@ async function change(s: Session, action: 'ask' | 'edit' | 'keep' | 'undo', body
     await syncProject(s, h);
     // Load the project before reading it: an edit can be the first request a session gets, ahead of any inspect.
     const index = s.index ?? refresh(s);
-    const result = directEdit(s.project!, s.info.dir, index, { tag, operations: body.operations, allow: strings(body.allow), label: typeof body.label === 'string' ? body.label : undefined });
-    if (!result.ok) return json(result, 422);
+    // Wider targets are never taken from the request. Only a saved proposal that the person confirms can allow them.
+    const label = typeof body.label === 'string' ? body.label : undefined;
+    const result = directEdit(s.project!, s.info.dir, index, { tag, operations: body.operations, label });
+    if (!result.ok) {
+      const { confirmable, ...refusal } = result;
+      if (confirmable) {
+        s.proposals.create({ kind: 'direct', tag, instruction: confirmable.summary, label, operations: confirmable.operations, confirm: result.confirm, impact: describeImpact(index, result.confirm), snapshot: snapshotHash(s.project!, s.info.dir, h.wt.root) });
+      }
+      return json({ ...refusal, proposal: view(s).proposal }, 422);
+    }
     await applyChanges(s, h, result.changes);
     s.pending = { kind: 'direct', instruction: result.summary, tag, changes: result.changes, spans: result.spans, checks: result.checks };
     return json({ ok: true, session: view(s), nextTag: result.nextTag, moved: moveTags(tagList(body), result.changes, result.spans, 'forward') });
@@ -255,17 +315,30 @@ async function change(s: Session, action: 'ask' | 'edit' | 'keep' | 'undo', body
     // The model call is slow. Start from the code as it is on disk now, and check again before writing the result.
     await syncProject(s, h);
     const index = s.index ?? refresh(s);
-    // The selection is the scope. `allow` carries wider targets the person confirmed after a needs-confirmation reply.
-    const allow = strings(body.allow);
-    const outcome = await proposeEdit({ signal, client, model: MODEL, project: s.project!, root: s.info.dir, index, route: String(body.route ?? '/'), tag: String(body.tag ?? ''), instruction, reference, allow });
-    if (!outcome.changes) return json({ ok: false, attempts: outcome.attempts, errors: outcome.errors, confirm: outcome.confirm }, 422);
+    // The selection is the scope. Wider targets are never taken from the request: when the model's change needs a
+    // shared component, the operations are saved here and only a confirmation of that proposal can allow it.
+    const tag = String(body.tag ?? '');
+    const outcome = await proposeEdit({ signal, client, model: MODEL, project: s.project!, root: s.info.dir, index, route: String(body.route ?? '/'), tag, instruction, reference });
+    if (!outcome.changes) {
+      if (outcome.operations && outcome.confirm.length) {
+        s.proposals.create({ kind: 'ask', tag, instruction, reference, operations: outcome.operations, confirm: outcome.confirm, impact: describeImpact(index, outcome.confirm), snapshot: snapshotHash(s.project!, s.info.dir, h.wt.root) });
+      }
+      return json({ ok: false, attempts: outcome.attempts, errors: outcome.errors, confirm: outcome.confirm, usage: outcome.usage, proposal: view(s).proposal }, 422);
+    }
     const changes = outcome.changes.filter((c) => c.before !== c.after);
     if (!changes.length) return json({ ok: false, attempts: outcome.attempts, errors: ['Nothing changed. The code already says that.'], confirm: [] }, 422);
     await applyChanges(s, h, changes);
-    s.pending = { kind: 'ask', instruction, tag: String(body.tag), changes, reference, spans: outcome.spans, checks: outcome.checks };
+    s.pending = { kind: 'ask', instruction, tag, changes, reference, spans: outcome.spans, checks: outcome.checks };
     return json({ ok: true, attempts: outcome.attempts, usage: outcome.usage, session: view(s), nextTag: outcome.nextTag, moved: moveTags(tagList(body), changes, outcome.spans, 'forward') });
   }
+  if (action === 'confirm') return confirmProposal(s, h, body);
+  if (action === 'cancel') {
+    // Dropping a proposal writes nothing: the files, the pending change and the history stay as they are.
+    const cancelled = typeof body.proposalId === 'string' && s.proposals.cancel(body.proposalId);
+    return json({ ok: true, cancelled, session: view(s) });
+  }
   const tags = tagList(body);
+  s.proposals.clear();
   if (action === 'keep') {
     if (!s.pending) return fail(409, 'There is no change waiting to be kept or undone.');
     const pending = s.pending;
@@ -363,7 +436,7 @@ async function handle(req: Request): Promise<Response> {
     starting = (async () => {
       const plan = provider.durable ? await planPass(body.fresh === true) : null;
       const info = await provider.start(id, options.repo, { editorOrigin: EDITOR_ORIGIN, baseCommit: plan?.baseCommit, restore: plan?.restore });
-      const created: Session = { id, fixture, info, state: 'starting' };
+      const created: Session = { id, fixture, info, state: 'starting', proposals: new ProposalStore(options.confirmation?.now, options.confirmation?.ttlMs) };
       try { await plan?.finish(created); } catch (error) { await provider.stop(info).catch(() => undefined); throw error; }
       sessions.set(id, created);
       return created;
@@ -411,7 +484,7 @@ async function handle(req: Request): Promise<Response> {
     return json(editableText(s, String(body.tag ?? ''), Array.isArray(body.ancestors) ? (body.ancestors as Ancestor[]) : []));
   }
 
-  if (action === 'ask' || action === 'edit' || action === 'keep' || action === 'undo') {
+  if (action === 'ask' || action === 'edit' || action === 'confirm' || action === 'cancel' || action === 'keep' || action === 'undo') {
     try {
       return await exclusive(s, () => change(s, action, body, req.signal));
     } catch (error) {
