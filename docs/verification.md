@@ -50,6 +50,16 @@ Delivery through the browser preserved an advanced, detached, dirty input checko
 
 Independent reviews found diagnostic path exposure, an undo staging race, and selection timing issues. Regression tests reproduced those failures before their fixes. Fault-injection tests also verified undo recovery when a save fails after renaming the pass file. The subsequent suite passed with `bun --smol test --timeout 30000`: 442 passed, 11 Docker tests skipped, and none failed. Typecheck passed.
 
+## Selection and stylesheet regression checks
+
+A follow-up Chromium run on the same Next.js 15.5.14 project reproduced a clicked outline following hover, the inspector disappearing during pending review, and a utility class losing to an app stylesheet rule. The fixes keep the clicked outline locked, keep the disabled inspector visible, and provide an explicit app-style override.
+
+The browser verified computed padding changing from 17px to 24px and then 32px, followed by Undo restoring 24px. The second edit required no new selection. Text editing and Keep retained the selected element. Replacing its DOM node after the response preserved its outline. Escape in the preview released selection and restored hover targeting.
+
+Delayed inspection responses could not replace a newer selection. Delaying an edit response kept selection locked until completion. A scripted Ask failure disabled competing property edits and preserved selection after the failure. That browser request was stubbed; no live model service was used. These checks recorded no browser exceptions. Browser tooling and its runtime libraries stayed outside the repository.
+
+Independent review found overlapping-request and delayed-text-approval races. Both were fixed, with regression coverage. Typecheck passed, and the subsequent full suite passed with 446 tests, 11 Docker tests skipped, and none failed.
+
 ## Automated checks
 
 Before publishing each slice, validation ran:

@@ -20,3 +20,5 @@ On desktop, the preview fills the available area beside a 380-pixel inspector. O
 Use native inputs, selects, buttons, and details elements for the current controls. The confirmation panel receives focus, exposes routes and call sites, and supports Escape to cancel. Delivery explains its base commit and shows branch and download results. Loading indicators always have action text; reduced motion disables their spin.
 
 Keep keyboard focus visible with the existing cobalt outline. Use explicit labels and alert or status roles for failures and recovery. Preserve empty, loading, blocked, and completed states. Do not add decorative animation or another component dependency for these surfaces.
+
+A clicked preview outline stays on that element while the pointer moves. Clicking another element switches selection; Escape releases it. Saving freezes selection until the response arrives. Keep the inspector visible, with disabled controls, beside the pending change actions. Property controls explain stylesheet precedence and offer an explicit override rather than silently changing CSS priority.

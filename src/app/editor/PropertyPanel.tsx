@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { changeLabel, changeProperty, classOperations, PROPERTIES, resolveProperty, type PanelOption, type PanelOptions, type PropertyId } from '../../edit/classes';
 import type { EditOperation } from '../../edit/operations';
 import type { StyleSource } from '../../edit/properties';
@@ -25,6 +25,7 @@ export function PropertyPanel({ style, options, component, busy, onEdit }: {
   onEdit: (operations: EditOperation[], label: string) => void;
 }) {
   const lockedId = useId();
+  const [overrideStyles, setOverrideStyles] = useState(false);
   const locked = style.className.kind === 'locked' ? style.className.reason : null;
   const classes = style.className.kind === 'static' ? style.className.classes : [];
 
@@ -39,7 +40,7 @@ export function PropertyPanel({ style, options, component, busy, onEdit }: {
   }
 
   function setProperty(id: PropertyId, value: string | null) {
-    const changes = changeProperty(classes, id, value, options);
+    const changes = changeProperty(classes, id, value, options, overrideStyles ? 'important' : 'normal');
     if (changes.length) onEdit(classOperations(style.target, changes), changeLabel(id, resolveProperty(classes, id, options).value, value));
   }
 
@@ -58,6 +59,15 @@ export function PropertyPanel({ style, options, component, busy, onEdit }: {
       )}
 
       {locked && <p id={lockedId} className="rounded-[6px] border border-rule bg-wash p-3 text-[13px] leading-snug">{locked}</p>}
+
+      {!locked && <div className="space-y-1">
+        <p className="text-[12px] leading-snug text-quiet">These controls show utility classes. Your app's styles can override them.</p>
+        <label className="flex items-center gap-2 text-[13px]">
+          <input type="checkbox" checked={overrideStyles} disabled={busy} onChange={(e) => setOverrideStyles(e.target.checked)} />
+          Override app styles for new changes
+        </label>
+        {overrideStyles && <p className="text-[12px] leading-snug text-quiet">Overrides stylesheet and responsive rules. Keep this off unless a value does not appear.</p>}
+      </div>}
 
       {SECTIONS.map((section) => (
         <fieldset key={section} className="space-y-2" disabled={busy || locked !== null} aria-describedby={locked ? lockedId : undefined}>
@@ -112,7 +122,7 @@ function PropertyControl({ id, label, classes, options, choices, onChange }: {
       <div className="flex items-center gap-1.5">
         {known?.swatch && <span aria-hidden className="size-5 shrink-0 rounded-[4px] border border-rule" style={{ background: known.swatch }} />}
         <select id={controlId} className={select} value={current ?? NONE} onChange={(e) => onChange(e.target.value === NONE ? null : e.target.value)}>
-          <option value={NONE}>Not set</option>
+          <option value={NONE}>No utility class</option>
           {/* A value outside the repo's tokens and the scale is shown so the control tells the truth, but not offered anew. */}
           {current !== null && !known && <option value={current}>{current || 'default'} (custom)</option>}
           {GROUPS.map((group) => {

@@ -270,8 +270,9 @@ export interface ClassChange {
  * when there is one and added when there isn't. More specific classes that would override it are removed. Shorthands
  * and classes behind a variant (`md:`, `hover:`) are left alone. Under an important shorthand such as `!p-4` the
  * class is written important too, in the same form, because a plain `px-6` would lose to it and change nothing.
+ * Explicit important priority lets a person override app stylesheet rules without changing the default cascade.
  */
-export function changeProperty(classes: string[], id: PropertyId, value: string | null, options: PanelOptions): ClassChange[] {
+export function changeProperty(classes: string[], id: PropertyId, value: string | null, options: PanelOptions, priority: 'normal' | 'important' = 'normal'): ClassChange[] {
   const found = matches(classes, id, options);
   const changes: ClassChange[] = [];
   const remove = (parsed: ParsedClass) => { if (!changes.some((c) => c.from === parsed.raw)) changes.push({ from: parsed.raw, to: '' }); };
@@ -281,9 +282,9 @@ export function changeProperty(classes: string[], id: PropertyId, value: string 
     const shorthand = winner(found.broader);
     const gives = shorthand !== undefined && spec(id).broader.some((root) => valueFor(id, root, shorthand.utility, options) === value);
     // The shorthand's value shows once the control's own class is gone, unless that class is the important one.
-    const covered = gives && (Boolean(shorthand?.important) || !own?.important);
+    const covered = gives && (Boolean(shorthand?.important) || (!own?.important && priority === 'normal'));
     const next = classFor(id, value);
-    const important = own?.important || shorthand?.important || '';
+    const important = own?.important || shorthand?.important || (priority === 'important' ? 'before' : '');
     const written = important === 'before' ? `!${next}` : important === 'after' ? `${next}!` : next;
     // A shorthand that already gives this value needs no class of its own: `p-4 px-2` set to 4 becomes `p-4`.
     if (covered) { if (own) remove(own); }

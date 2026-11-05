@@ -108,7 +108,8 @@ export function EditorApp() {
   const [target, setTargetState] = useState<Target | null>(null);
   // Callbacks that outlive a render read the selection from here, so they always follow the newest tags.
   const targetRef = useRef<Target | null>(null);
-  const setTarget = useCallback((next: Target | null) => { targetRef.current = next; setTargetState(next); }, []);
+  const inspectionRequest = useRef(0);
+  const setTarget = useCallback((next: Target | null) => { inspectionRequest.current++; targetRef.current = next; setTargetState(next); }, []);
   const [recoveryShown, setRecoveryShown] = useState(true);
   const [undoing, setUndoing] = useState<string | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
@@ -123,7 +124,8 @@ export function EditorApp() {
   const [notice, setNotice] = useState<string | null>(null);
   // The page element being typed in (`key`, as the preview knows it) and the source tag its text is written at.
   const [textEdit] = useState(textEditTracker);
-  const [editing, setEditing] = useState(false);
+  const [mutating, setMutating] = useState(false);
+  const mutationActive = useRef(false);
   const [started, setStarted] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const frame = useRef<HTMLIFrameElement>(null);
@@ -158,16 +160,33 @@ export function EditorApp() {
     if (session) frame.current?.contentWindow?.postMessage(message, new URL(session.previewUrl).origin);
   }, [session]);
 
+  const beginChange = useCallback(() => {
+    if (mutationActive.current) return false;
+    mutationActive.current = true;
+    setMutating(true);
+    textEdit.ask();
+    post({ type: 'neat:busy', busy: true });
+    return true;
+  }, [post, textEdit]);
+
+  const endChange = useCallback(() => {
+    mutationActive.current = false;
+    setMutating(false);
+    post({ type: 'neat:busy', busy: false });
+  }, [post]);
+
   const inspect = useCallback(async (tag: string, at: string, ancestors: Target['ancestors']) => {
     if (!session) return;
-    try { setInspection(await api<Inspection>(`sessions/${session.id}/inspect`, { body: { tag, route: at, ancestors } })); }
-    catch (e) { setInspection(null); setAskError((e as Error).message); }
+    const ticket = ++inspectionRequest.current;
+    try {
+      const next = await api<Inspection>(`sessions/${session.id}/inspect`, { body: { tag, route: at, ancestors } });
+      if (ticket === inspectionRequest.current) setInspection(next);
+    } catch (e) { if (ticket === inspectionRequest.current) { setInspection(null); setAskError((e as Error).message); } }
   }, [session]);
 
   /** Send operations from a control to the worker. They apply without the model and wait for Keep or Undo. */
   const directEdit = useCallback(async (tag: string, operations: EditOperation[], label?: string): Promise<boolean> => {
-    if (!session) return false;
-    setEditing(true);
+    if (!session || !beginChange()) return false;
     try {
       const held = targetRef.current;
       const res = await api<{ ok: boolean; session?: Session; message?: string; moved?: Record<string, string | null>; proposal?: ProposalView | null }>(`sessions/${session.id}/edit`, { body: { tag, operations, label, tags: held ? targetTags(held) : [] } });
@@ -175,18 +194,19 @@ export function EditorApp() {
       if (!res.ok || !res.session) { setNotice(res.message ?? "That change couldn't be made."); return false; }
       // The change can move lines and columns. The selection follows its element, so the panel is back on the same
       // element once the change is kept or undone, and the next tweak targets the right place.
-      if (held && res.moved) setTarget(moveTarget(held, res.moved));
       setNotice(null); setSession(res.session); setProposal(res.session.proposal);
+      if (held) followSelection(held, res.moved);
       return true;
     } catch (e) { setNotice((e as Error).message); return false; }
-    finally { setEditing(false); }
-  }, [session, setTarget]);
+    finally { endChange(); }
+  }, [session, setTarget, post, inspect, route, beginChange, endChange]);
 
   useEffect(() => {
     if (!session) return;
     const origin = new URL(session.previewUrl).origin;
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== origin || !e.data || typeof e.data.type !== 'string') return;
+      if ((e.data.type === 'neat:text-request' || e.data.type === 'neat:select') && mutationActive.current) return;
       if (e.data.type === 'neat:text-request') {
         const t = e.data.target as Target;
         const key = t.inst ?? t.src;
@@ -220,9 +240,11 @@ export function EditorApp() {
       }
       if (e.data.type === 'neat:route' || e.data.type === 'neat:ready') setRoute(e.data.route);
       if (e.data.type === 'neat:ready') post({ type: 'neat:mode', selecting });
+      if (e.data.type === 'neat:deselect') { inspectionRequest.current++; setTarget(null); setInspection(null); }
       if (e.data.type === 'neat:select') {
         const t = e.data.target as Target;
         setTarget(t);
+        setInspection(null);
         setAskError(null);
         setNotice(null);
         // A component's instance tag points at where it's used, which is what an edit should change.
@@ -252,6 +274,7 @@ export function EditorApp() {
     e.preventDefault();
     if (!session || !inspection || !instruction.trim() || asking || proposal) return;
     const held = targetRef.current;
+    if (!beginChange()) return;
     setAsking(true); setAskError(null); setProposalError(null); setStarted(Date.now());
     try {
       const res = await api<{ ok: boolean; session?: Session; errors?: string[]; confirm?: Array<{ component: string; uses: number }>; proposal?: ProposalView | null; moved?: Record<string, string | null> }>(`sessions/${session.id}/ask`, { body: { tag: inspection.instance?.tag ?? inspection.tag, route, instruction, tags: held ? targetTags(held) : [] } });
@@ -264,13 +287,14 @@ export function EditorApp() {
         followSelection(held, res.moved);
       }
     } catch (err) { setAskError((err as Error).message); }
-    finally { setAsking(false); setStarted(null); }
+    finally { setAsking(false); setStarted(null); endChange(); }
   }
 
   /** Make the saved change. The worker replays what it saved, so the model is not asked again. */
   async function confirmShared() {
     if (!session || !proposal || confirming) return;
     const held = targetRef.current;
+    if (!beginChange()) return;
     setConfirming(true); setProposalError(null);
     try {
       const res = await api<{ ok: boolean; session?: Session; message?: string; errors?: string[]; moved?: Record<string, string | null> }>(`sessions/${session.id}/confirm`, { body: { proposalId: proposal.id, allowSharedComponent: true, tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
@@ -284,7 +308,7 @@ export function EditorApp() {
       // A proposal that timed out, went stale, or is gone can't be confirmed again. Anything else can be retried.
       if (code === 'STALE_PROPOSAL' || code === 'EXPIRED_PROPOSAL' || code === 'UNKNOWN_PROPOSAL') { setProposal(null); setAskError((err as Error).message); }
       else setProposalError((err as Error).message);
-    } finally { setConfirming(false); }
+    } finally { setConfirming(false); endChange(); }
   }
 
   /** Drop the saved change. Nothing was written, so there is nothing to undo. */
@@ -303,7 +327,7 @@ export function EditorApp() {
     const next = held && moved ? moveTarget(held, moved) : null;
     const tag = next && (next.inst ?? next.src);
     if (!next || !tag) {
-      setInspection(null); setTarget(null); post({ type: 'neat:clear' });
+      inspectionRequest.current++; setInspection(null); setTarget(null); post({ type: 'neat:clear' });
       if (held) setNotice("The element you had selected moved and couldn't be followed. Click it again.");
       return;
     }
@@ -315,6 +339,7 @@ export function EditorApp() {
   async function settle(action: 'keep' | 'undo') {
     if (!session) return;
     const held = targetRef.current;
+    if (!beginChange()) return;
     try {
       const done = await api<Settled>(`sessions/${session.id}/${action}`, { body: { tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
       setSession(done);
@@ -323,19 +348,21 @@ export function EditorApp() {
       else { setInspection(null); setTarget(null); post({ type: 'neat:clear' }); }
     }
     catch (e) { setAskError((e as Error).message); }
+    finally { endChange(); }
   }
 
   /** Take one kept step back. The server says no when later steps depend on it, and the notice says why. */
   async function undoStep(step: Step) {
     if (!session || undoing) return;
     const held = targetRef.current;
+    if (!beginChange()) return;
     setUndoing(step.id); setNotice(null);
     try {
       const done = await api<Settled>(`sessions/${session.id}/undo`, { body: { step: step.id, tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
       setSession(done);
       if (held) followSelection(held, done.moved);
     } catch (e) { setNotice((e as Error).message); }
-    finally { setUndoing(null); }
+    finally { setUndoing(null); endChange(); }
   }
 
   const frameWidth = WIDTHS[width];
@@ -365,7 +392,7 @@ export function EditorApp() {
             <button type="button" className="chip flex items-center gap-1.5" aria-pressed={selecting} onClick={() => setSelecting((s) => !s)} title="Select elements (turn off to use the page normally)">
               <MousePointer2 size={13} /> Select
             </button>
-            <button type="button" className="btn-secondary !py-1 !text-[13px]" onClick={stop}>
+            <button type="button" className="btn-secondary !py-1 !text-[13px]" disabled={mutating} onClick={stop}>
               <Square size={12} /> Stop
             </button>
           </>
@@ -422,19 +449,18 @@ export function EditorApp() {
               {session.recovery && recoveryShown && <RecoveryNotice recovery={session.recovery} onDismiss={() => setRecoveryShown(false)} />}
               {session.pass && !session.pass.durable && <p role="status" className="text-[13px] text-quiet">This preview keeps edits for this session only. Use the default local preview to save passes and deliver branches.</p>}
               {notice && <p role="status" className="rounded-[6px] border border-rule bg-wash p-3 text-[13px] leading-snug">{notice}</p>}
-              {session.pending ? (
-                <PendingChange session={session} onSettle={settle} />
-              ) : proposal ? (
+              {session.pending && <PendingChange session={session} busy={mutating} onSettle={settle} />}
+              {proposal ? (
                 <ConfirmShared proposal={proposal} busy={confirming} error={proposalError} onConfirm={confirmShared} onCancel={cancelShared} />
               ) : inspection ? (
-                <InspectorPanel inspection={inspection} target={target} busy={editing} onEdit={(operations, label) => { if (inspection.style) void directEdit(inspection.style.target, operations, label); }} />
+                <InspectorPanel inspection={inspection} target={target} busy={mutating || !!session.pending} onEdit={(operations, label) => { if (inspection.style) void directEdit(inspection.style.target, operations, label); }} />
               ) : (
                 <p className="text-[15px] text-quiet">{session.state === 'ready' ? 'Click anything on the page to see which component and line it comes from. Double-click text to edit it.' : 'The inspector fills in once the preview is running.'}</p>
               )}
               {session.pass?.durable && session.timeline.some((step) => step.status === 'kept') && (
-                <DeliveryPanel session={session} blocked={!!session.pending || !!proposal || confirming || undoing !== null} onDelivery={(delivery) => setSession((current) => (current ? { ...current, delivery } : current))} />
+                <DeliveryPanel session={session} blocked={mutating || !!session.pending || !!proposal} onDelivery={(delivery) => setSession((current) => (current ? { ...current, delivery } : current))} />
               )}
-              {session.timeline.length > 0 && <Timeline steps={session.timeline} busy={undoing !== null || !!session.pending || !!proposal || confirming} undoing={undoing} onUndo={undoStep} />}
+              {session.timeline.length > 0 && <Timeline steps={session.timeline} busy={mutating || !!session.pending || !!proposal} undoing={undoing} onUndo={undoStep} />}
             </div>
 
             <form onSubmit={ask} className="space-y-2 border-t border-ink p-4">
@@ -447,7 +473,7 @@ export function EditorApp() {
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
-                disabled={!inspection || asking || !!session.pending || !!proposal}
+                disabled={!inspection || mutating || !!session.pending || !!proposal}
                 placeholder={session.pending ? 'Keep or undo the last change first.' : proposal ? 'Confirm or cancel the shared change first.' : 'Make this the main call to action…'}
                 className="w-full resize-none rounded-[8px] border border-ink bg-page p-3 text-[14px] placeholder:text-quiet disabled:bg-wash"
               />
@@ -455,7 +481,7 @@ export function EditorApp() {
                 <span className="caption text-quiet" aria-live="polite">
                   {asking && started ? `Working · ${((now - started) / 1000).toFixed(1)} s` : model ? model.name : ''}
                 </span>
-                <button type="submit" className="btn-primary !px-4 !py-2 !text-[14px]" disabled={!inspection || asking || !instruction.trim() || !!session.pending || !!proposal}>
+                <button type="submit" className="btn-primary !px-4 !py-2 !text-[14px]" disabled={!inspection || mutating || !instruction.trim() || !!session.pending || !!proposal}>
                   {asking ? <Loader2 size={14} className="animate-spin" /> : null} Ask
                 </button>
               </div>
@@ -484,7 +510,7 @@ function InspectorPanel({ inspection, target, busy, onEdit }: { inspection: Insp
         <p className="text-[13px] text-quiet">Inside <span className="font-mono text-ink">{inspection.component.name}</span>, used {inspection.component.uses}× in this repo. A change here shows everywhere {inspection.component.name} is used.</p>
       )}
 
-      {inspection.style && <PropertyPanel style={inspection.style} options={inspection.options} component={inspection.instanceOf} busy={busy} onEdit={onEdit} />}
+      {inspection.style && <PropertyPanel key={inspection.style.target} style={inspection.style} options={inspection.options} component={inspection.instanceOf} busy={busy} onEdit={onEdit} />}
 
       {/* Code stays out of the way unless someone asks to see it. */}
       <details>
@@ -577,12 +603,12 @@ function ConfirmShared({ proposal, busy, error, onConfirm, onCancel }: { proposa
   );
 }
 
-function PendingChange({ session, onSettle }: { session: Session; onSettle: (action: 'keep' | 'undo') => void }) {
+function PendingChange({ session, busy, onSettle }: { session: Session; busy: boolean; onSettle: (action: 'keep' | 'undo') => void }) {
   const pending = session.pending!;
   return (
     <section className="space-y-3">
       <div className="space-y-1">
-        <h2 className="caption text-quiet">Change applied to the preview</h2>
+        <h2 className="caption text-quiet">Source updated. Review the preview</h2>
         <p className="text-[15px]">{pending.instruction}</p>
       </div>
       {/* A change made with a control keeps its code out of the way until someone asks to see it. */}
@@ -602,8 +628,8 @@ function PendingChange({ session, onSettle }: { session: Session; onSettle: (act
         ))}
       </details>
       <div className="flex gap-2">
-        <button type="button" className="btn-primary !px-4 !py-2 !text-[14px]" onClick={() => onSettle('keep')}><Check size={14} /> Keep</button>
-        <button type="button" className="btn-secondary" onClick={() => onSettle('undo')}><Undo2 size={14} /> Undo</button>
+        <button type="button" className="btn-primary !px-4 !py-2 !text-[14px]" disabled={busy} onClick={() => onSettle('keep')}><Check size={14} /> Keep</button>
+        <button type="button" className="btn-secondary" disabled={busy} onClick={() => onSettle('undo')}><Undo2 size={14} /> Undo</button>
       </div>
       <p className="caption flex items-center gap-1.5 text-quiet"><X size={11} /> Not committed until you keep it</p>
       {pending.checks.length > 0 && <p className="text-[12px] leading-snug text-quiet">{checkSummary(pending.checks)}</p>}

@@ -10,6 +10,8 @@ export function bridgeSource(editorOrigin: string): string {
   if (typeof window === 'undefined' || window.parent === window) return;
   var EDITOR = ${JSON.stringify(editorOrigin)};
   var selecting = true;
+  var busy = false;
+  var confirmedTag = null;
   var box = null;
   var label = null;
   var selected = null;
@@ -92,6 +94,7 @@ export function bridgeSource(editorOrigin: string): string {
   function restoreSelection(confirmed) {
     if (!selecting || editing) return;
     // Before the editor confirms a new tag, keep the node's identity. Its old tag may already name a neighbor.
+    if (!wantedTag && selected && !selected.isConnected && confirmedTag) wantedTag = confirmedTag;
     if (!wantedTag) {
       if (selected) show(selected.isConnected ? selected : null, selected.isConnected ? nameOf(selected) : '');
       return;
@@ -103,6 +106,7 @@ export function bridgeSource(editorOrigin: string): string {
     }
     if (waitingNode && waitingNode.isConnected) {
       selected = waitingNode;
+      confirmedTag = wantedTag;
       wantedTag = null;
       waitingNode = null;
       waitingKey = null;
@@ -121,11 +125,13 @@ export function bridgeSource(editorOrigin: string): string {
     waitingKey = null;
     wantedTag = null;
     selected = next;
+    confirmedTag = key;
     show(selected, nameOf(selected));
   }
 
   function clearSelection() {
     selected = null;
+    confirmedTag = null;
     wantedTag = null;
     waitingNode = null;
     waitingKey = null;
@@ -187,19 +193,23 @@ export function bridgeSource(editorOrigin: string): string {
       send({ type: 'neat:text-cancel', key: edit.key, reason: commit && !text ? 'empty' : 'unchanged' });
     }
     if (el.blur) el.blur();
+    restoreSelection(false);
   }
 
   function onBlur() { finishEditing(true); }
 
   document.addEventListener('keydown', function (e) {
-    if (!editing) return;
+    if (!editing) {
+      if (e.key === 'Escape' && selected && !busy) { clearSelection(); send({ type: 'neat:deselect' }); }
+      return;
+    }
     e.stopPropagation();
     if (e.key === 'Enter') { e.preventDefault(); finishEditing(true); }
     if (e.key === 'Escape') { e.preventDefault(); finishEditing(false); }
   }, true);
 
   document.addEventListener('dblclick', function (e) {
-    if (!selecting || editing) return;
+    if (!selecting || editing || busy) return;
     var el = tagged(e.target);
     if (!el) return;
     e.preventDefault();
@@ -210,13 +220,14 @@ export function bridgeSource(editorOrigin: string): string {
   }, true);
 
   document.addEventListener('mousemove', function (e) {
-    if (!selecting || editing) return;
+    if (!selecting || editing || busy || selected) return;
     var el = tagged(e.target);
-    show(el || selected, el ? nameOf(el) : selected ? nameOf(selected) : '');
+    show(el, el ? nameOf(el) : '');
   }, true);
 
   document.addEventListener('click', function (e) {
     if (!selecting) return;
+    if (busy) { e.preventDefault(); e.stopPropagation(); return; }
     if (editing) {
       // A click in the text places the caret; it must not follow a link, press a button, or change the selection.
       if (editing.el.contains(e.target)) { e.preventDefault(); e.stopPropagation(); }
@@ -227,6 +238,7 @@ export function bridgeSource(editorOrigin: string): string {
     e.preventDefault();
     e.stopPropagation();
     selected = el;
+    confirmedTag = null;
     wantedTag = null;
     waitingNode = null;
     waitingKey = null;
@@ -238,12 +250,13 @@ export function bridgeSource(editorOrigin: string): string {
 
   window.addEventListener('message', function (e) {
     if (e.origin !== EDITOR || !e.data || typeof e.data.type !== 'string') return;
+    if (e.data.type === 'neat:busy') { busy = !!e.data.busy; if (busy) { confirmedTag = null; asked = null; finishEditing(false); } }
     if (e.data.type === 'neat:mode') {
       selecting = !!e.data.selecting;
       if (!selecting) { finishEditing(false); clearSelection(); }
     }
     // The editor answers a double-click once the worker has confirmed the text is written in the JSX.
-    if (e.data.type === 'neat:text-edit' && asked && keyOf(asked) === e.data.key && !editing) startEditing(asked);
+    if (e.data.type === 'neat:text-edit' && selecting && !busy && asked && asked.isConnected && keyOf(asked) === e.data.key && !editing) startEditing(asked);
     if (e.data.type === 'neat:text-revert' && committed && committed.key === e.data.key) {
       committed.el.textContent = committed.original;
       committed = null;
