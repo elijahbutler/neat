@@ -239,7 +239,14 @@ export function EditorApp() {
         if (e.data.reason === 'mixed') setNotice('This element holds other elements, not only text. Double-click the text itself, or ask for the change.');
       }
       if (e.data.type === 'neat:route' || e.data.type === 'neat:ready') setRoute(e.data.route);
-      if (e.data.type === 'neat:ready') post({ type: 'neat:mode', selecting });
+      if (e.data.type === 'neat:ready') {
+        post({ type: 'neat:mode', selecting });
+        post({ type: 'neat:busy', busy: mutationActive.current });
+        // Fast Refresh can reload the whole iframe. Restore only tags confirmed by the worker.
+        const held = targetRef.current;
+        const tag = held && (held.inst ?? held.src);
+        if (tag && !mutationActive.current) post({ type: 'neat:reselect', tag });
+      }
       if (e.data.type === 'neat:deselect') { inspectionRequest.current++; setTarget(null); setInspection(null); }
       if (e.data.type === 'neat:select') {
         const t = e.data.target as Target;

@@ -54,7 +54,7 @@ Independent reviews found diagnostic path exposure, an undo staging race, and se
 
 A follow-up Chromium run on the same Next.js 15.5.14 project reproduced a clicked outline following hover, the inspector disappearing during pending review, and a utility class losing to an app stylesheet rule. The fixes keep the clicked outline locked, keep the disabled inspector visible, and provide an explicit app-style override.
 
-The browser verified computed padding changing from 17px to 24px and then 32px, followed by Undo restoring 24px. The second edit required no new selection. Text editing and Keep retained the selected element. Replacing its DOM node after the response preserved its outline. Escape in the preview released selection and restored hover targeting.
+The browser verified computed padding changing from 17px to 24px and then 32px, followed by Undo restoring 24px. The second edit required no new selection. Text editing and Keep retained the selected element. Replacing its DOM node after the response preserved its outline. A separate before-and-after browser check reproduced selection loss during a full iframe reload with the previous client. The fixed client restored selection when the reload happened before or after the edit response. Escape in the preview released selection and restored hover targeting.
 
 Delayed inspection responses could not replace a newer selection. Delaying an edit response kept selection locked until completion. A scripted Ask failure disabled competing property edits and preserved selection after the failure. That browser request was stubbed; no live model service was used. These checks recorded no browser exceptions. Browser tooling and its runtime libraries stayed outside the repository.
 
