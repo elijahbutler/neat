@@ -13,7 +13,7 @@ Read [the feature map](features/README.md) before choosing coverage. The editor 
 
 ## Launch
 
-Run commands from the repository root. Requirements are Node.js 22.12 or newer, Bun, Git, installed project and fixture dependencies, and an externally supplied Playwright module exporting `chromium`. Reuse installed dependencies. If dependencies are absent, report the missing preparation. The documented preparation commands are `bun install` and `bun run fixtures:install`. Do not install browser tooling into this repository or run a production build.
+Run commands from the repository root. Requirements are Node.js 22.12 or newer, stable Bun 1.3.13 or newer, Git, installed project and fixture dependencies, and an externally supplied Playwright module exporting `chromium`. Reuse installed dependencies. If dependencies are absent, report the missing preparation. The documented preparation commands are `bun install` and `bun run fixtures:install`. Do not install browser tooling into this repository or run a production build.
 
 Inspect existing listeners and processes first. Port 4400 is reserved for the user's pilot. Never connect the runner to that instance, stop it, or reuse its saved data. Use the runner's disposable Git application and fresh `NEAT_HOME`. Two workers must never share a saved pass.
 

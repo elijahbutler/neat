@@ -11,12 +11,12 @@ import { help, isInside, parseOptions, repository } from './verification/options
 import { checkoutDiff, git, prepareFixture, snapshot } from './verification/fixture.mjs';
 import { startScriptedProvider } from './verification/provider.mjs';
 import { exerciseEditor, exerciseWorkspaceRecovery, poll } from './verification/browser.mjs';
-import { cliArguments, cliEnvironment, runtimeMetadata, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
+import { cliArguments, cliEnvironment, requireIsolatedBun, runtimeMetadata, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
 
 if (process.argv.includes('--help')) {
   process.stdout.write(help);
 } else {
-  try { await main(parseOptions(process.argv.slice(2))); }
+  try { requireIsolatedBun(); await main(parseOptions(process.argv.slice(2))); }
   catch (error) { console.error(error.stack ?? error.message); process.exitCode = 1; }
 }
 

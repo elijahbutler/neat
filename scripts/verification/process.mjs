@@ -6,6 +6,13 @@ import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
 
+export function requireIsolatedBun(version = process.versions.bun) {
+  const parts = /^(\d+)\.(\d+)\.(\d+)$/.exec(version ?? '');
+  if (!parts || Number(parts[1]) < 1 || (Number(parts[1]) === 1 && (Number(parts[2]) < 3 || (Number(parts[2]) === 3 && Number(parts[3]) < 13)))) {
+    throw new Error('Browser acceptance requires stable Bun 1.3.13 or newer to disable dotenv loading.');
+  }
+}
+
 export function cliEnvironment({ home, root, providerPort }) {
   // Real credentials, proxy URLs, catalogues, Git configuration, and preload
   // options never reach the CLI or the selected-runtime probe.

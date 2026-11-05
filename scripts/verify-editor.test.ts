@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { parseOptions, repository } from './verification/options.mjs';
 import { git, gitEnvironment, snapshot } from './verification/fixture.mjs';
-import { cliArguments, cliEnvironment, runtimeMetadata, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
+import { cliArguments, cliEnvironment, requireIsolatedBun, runtimeMetadata, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
 import { poll } from './verification/browser.mjs';
 
 const driver = join(tmpdir(), 'browser-driver', 'index.mjs');
@@ -61,6 +61,13 @@ describe('browser acceptance command', () => {
 });
 
 describe('browser acceptance isolation', () => {
+  test('refuses runtimes that cannot guarantee dotenv isolation before launching a worker', () => {
+    for (const version of ['1.2.14', '1.3.12', '0.9.0', '1.4.0-canary', 'invalid', '']) {
+      expect(() => requireIsolatedBun(version)).toThrow('requires stable Bun 1.3.13 or newer');
+    }
+    for (const version of ['1.3.13', '1.4.4', '2.0.0']) expect(() => requireIsolatedBun(version)).not.toThrow();
+  });
+
   test('runtime metadata probes the PATH-selected Node with the sanitized CLI environment', async () => {
     const root = await mkdtemp(join(tmpdir(), 'neat-runtime-test-'));
     const node = join(root, 'node'), marker = join(root, 'preload-ran'), observed = join(root, 'environment.json');
