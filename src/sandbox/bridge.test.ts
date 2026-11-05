@@ -14,6 +14,8 @@ type Listener = (event: Record<string, unknown>) => void;
 
 /** Just enough of a page to run the bridge: listeners, attributes, and text. No layout, no browser. */
 function fakePage() {
+  const location = { pathname: '/about', search: '', hash: '' };
+  const timers: Array<() => void> = [];
   const elements: Array<{ isConnected: boolean; hasAttribute: (name: string) => boolean; getAttribute: (name: string) => string | null; children: unknown[]; style: Record<string, string> }> = [];
   let mutations: ((records: Array<{ target: unknown }>) => void) | null = null;
   const listeners = (store: Map<string, Listener[]>) => ({
@@ -62,7 +64,7 @@ function fakePage() {
     constructor(callback: (records: Array<{ target: unknown }>) => void) { mutations = callback; }
     observe() {}
   }
-  new Function('window', 'document', 'location', 'setInterval', 'MutationObserver', bridgeSource('http://editor.test'))(window, document, { pathname: '/about' }, () => 0, Observer);
+  new Function('window', 'document', 'location', 'setInterval', 'MutationObserver', bridgeSource('http://editor.test'))(window, document, location, (callback: () => void) => timers.push(callback), Observer);
   return {
     sent,
     element,
@@ -70,7 +72,7 @@ function fakePage() {
     outline: () => {
       const box = elements.find(el => el.hasAttribute('data-neat-overlay'));
       const label = box?.children[0];
-      return { display: box?.style.display, left: box?.style.left, label: label && typeof label === 'object' && 'textContent' in label ? label.textContent : null };
+      return { display: box?.style.display, left: box?.style.left, width: box?.style.width, height: box?.style.height, label: label && typeof label === 'object' && 'textContent' in label ? label.textContent : null };
     },
     last: () => sent.at(-1)!,
     dom: (type: string, extra: Record<string, unknown>) => {
@@ -79,10 +81,44 @@ function fakePage() {
       return e;
     },
     fromEditor: (data: Record<string, unknown>, origin = 'http://editor.test') => { for (const fn of win.get('message') ?? []) fn({ origin, data }); },
+    resize: () => { for (const fn of win.get('resize') ?? []) fn({}); },
+    navigate: (path: string) => { const next = new URL(path, 'http://preview.test'); location.pathname = next.pathname; location.search = next.search; location.hash = next.hash; },
+    tick: () => { for (const callback of timers) callback(); },
   };
 }
 
 describe('locked selection', () => {
+  test('reports a full preview URL while keeping inspection scope on the pathname', () => {
+    const page = fakePage();
+    page.navigate('/about?view=compact#team');
+    page.fromEditor({ type: 'neat:hello' });
+    expect(page.last()).toEqual({ type: 'neat:ready', route: '/about', url: '/about?view=compact#team' });
+    page.tick();
+    expect(page.last()).toEqual({ type: 'neat:route', route: '/about', url: '/about?view=compact#team' });
+    page.navigate('/about?view=wide#people');
+    page.tick();
+    expect(page.last()).toEqual({ type: 'neat:route', route: '/about', url: '/about?view=wide#people' });
+  });
+
+  test('redraws the selected outline when the preview viewport changes', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    page.dom('click', { target: heading });
+    expect(page.outline()).toMatchObject({ width: '10px', height: '10px' });
+    heading.getBoundingClientRect = () => ({ x: 20, y: 40, left: 20, top: 40, width: 280, height: 80 });
+    page.resize();
+    expect(page.outline()).toMatchObject({ left: '20px', width: '280px', height: '80px', label: 'h1  page.tsx:1:1' });
+  });
+
+  test('answers a readiness handshake only from the editor origin', () => {
+    const page = fakePage();
+    const count = page.sent.length;
+    page.fromEditor({ type: 'neat:hello' }, 'https://other.example');
+    expect(page.sent.length).toBe(count);
+    page.fromEditor({ type: 'neat:hello' });
+    expect(page.sent.slice(count)).toEqual([{ type: 'neat:ready', route: '/about', url: '/about' }]);
+  });
+
   test('keeps the clicked outline while hovering another element, until Escape releases it', () => {
     const page = fakePage();
     const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');

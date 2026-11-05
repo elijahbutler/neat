@@ -10,7 +10,7 @@ interface Variant { prop: string; options: string[]; defaultValue?: string }
 const NONE = '__none';
 const GROUPS = ['Tokens', 'Used in this repo', 'Tailwind scale'] as const;
 const SECTIONS = ['Spacing', 'Type', 'Color and shape'] as const;
-const select = 'w-full rounded-[6px] border border-rule bg-page px-2 py-1.5 text-[13px] focus:border-ink disabled:cursor-not-allowed disabled:bg-wash disabled:text-quiet';
+const select = 'property-select w-full rounded-[6px] border border-rule bg-page px-2 py-2 text-[13px] focus:border-ink disabled:cursor-not-allowed disabled:bg-wash disabled:text-quiet';
 
 /**
  * Controls for the selected element. A component's own options come first and become `set-prop`; the style controls
@@ -47,8 +47,8 @@ export function PropertyPanel({ style, options, component, busy, onEdit }: {
   return (
     <>
       {component && (
-        <section className="space-y-2">
-          <h3 className="caption text-quiet">{component.name} options · used {component.uses}×</h3>
+        <section className="property-group space-y-3">
+          <h3 className="text-[13px] font-semibold">{component.name} options <span className="font-normal text-quiet">· used {component.uses}×</span></h3>
           {component.variants.length === 0 && <p className="text-[13px] text-quiet">{component.name} has no options to choose from.</p>}
           <div className="grid grid-cols-2 gap-3">
             {component.variants.map((variant) => (
@@ -60,18 +60,9 @@ export function PropertyPanel({ style, options, component, busy, onEdit }: {
 
       {locked && <p id={lockedId} className="rounded-[6px] border border-rule bg-wash p-3 text-[13px] leading-snug">{locked}</p>}
 
-      {!locked && <div className="space-y-1">
-        <p className="text-[12px] leading-snug text-quiet">These controls show utility classes. Your app's styles can override them.</p>
-        <label className="flex items-center gap-2 text-[13px]">
-          <input type="checkbox" checked={overrideStyles} disabled={busy} onChange={(e) => setOverrideStyles(e.target.checked)} />
-          Override app styles for new changes
-        </label>
-        {overrideStyles && <p className="text-[12px] leading-snug text-quiet">Overrides stylesheet and responsive rules. Keep this off unless a value does not appear.</p>}
-      </div>}
-
       {SECTIONS.map((section) => (
-        <fieldset key={section} className="space-y-2" disabled={busy || locked !== null} aria-describedby={locked ? lockedId : undefined}>
-          <legend className="caption text-quiet">{section}</legend>
+        <fieldset key={section} className="property-group space-y-3" disabled={busy || locked !== null} aria-describedby={locked ? lockedId : undefined}>
+          <legend className="text-[13px] font-semibold">{section}</legend>
           <div className="grid grid-cols-2 gap-3">
             {PROPERTIES.filter((property) => property.group === section).map((property) => (
               <PropertyControl key={property.id} id={property.id} label={property.label} classes={classes} options={options} choices={options[property.options]} onChange={(value) => setProperty(property.id, value)} />
@@ -79,6 +70,15 @@ export function PropertyPanel({ style, options, component, busy, onEdit }: {
           </div>
         </fieldset>
       ))}
+
+      {!locked && <div className="style-precedence space-y-2">
+        <p className="text-[12px] leading-relaxed text-quiet">These controls show utility classes. Your app's styles can override them.</p>
+        <label className="flex items-start gap-2 text-[12px] leading-relaxed">
+          <input className="mt-1 shrink-0" type="checkbox" checked={overrideStyles} disabled={busy} onChange={(e) => setOverrideStyles(e.target.checked)} />
+          Override app styles for new changes
+        </label>
+        {overrideStyles && <p className="text-[12px] leading-relaxed text-quiet">Overrides stylesheet and responsive rules. Keep this off unless a value does not appear.</p>}
+      </div>}
     </>
   );
 }

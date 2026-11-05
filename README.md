@@ -19,17 +19,21 @@ For an app inside a repository:
 bun bin/neat.ts open /path/to/repository --app apps/web --port 4400
 ```
 
-Open the printed editor URL. The editor binds to `127.0.0.1:4317`, or the next free port. The preview starts on a separate loopback port from 4100. Port 3000 stays available. The client bundles with Bun at launch; no production build is required.
+Open the printed editor URL to follow startup while Neat prepares the preview. The editor binds to `127.0.0.1:4317`, or the next free port. The preview starts on a separate loopback port from 4100. Port 3000 stays available. Selection becomes available when the app connects. The client bundles with Bun at launch; no production build is required.
 
 The preview starts from a committed revision in a detached Git worktree. Your original files, index, and current branch stay unchanged, including uncommitted work. Commit changes you want included in a new preview first. Only open repositories you trust: their Next.js configuration and development code run on your machine.
 
 ## Make and keep changes
 
-1. Click an element in the preview to inspect it. Its outline stays locked while you hover elsewhere. Click another element to switch, or press Escape in the preview to release the selection. Double-click plain text to edit it in place. Use the property panel for supported classes and component options.
+Use the inspector's **Edit**, **History**, and **Deliver** tabs for properties and Ask, saved steps, and local delivery. Move between tabs with the arrow keys. Home selects **Edit**, and End selects **Deliver**.
+
+1. Choose **Select**, then click an element in the preview to inspect it. Its outline stays locked while you hover elsewhere. Click another element to switch, or press Escape in the preview to release the selection. Double-click plain text to edit it in place. Open **Edit** for supported classes and component options. Choose **Interact** to follow links and use the app normally.
 2. Review the preview change, then choose **Keep** or **Undo**. An applied change is not saved until you keep it.
 3. To use Ask, set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before launching. Direct edits need no key. Keep keys outside version control.
 4. If a change reaches a component definition, review its affected routes and source call sites. **Change everywhere** applies the saved operations without another model call. **Cancel** writes nothing.
-5. Expand **Code and checks** in the timeline to inspect a step's diff and check results. Each kept step has its own Undo action.
+5. Open **History** and expand **Code and checks** to inspect a step's diff and check results. Each kept step has its own Undo action. An undone step remains visible as **Undone**.
+
+Pending **Keep** and **Undo** controls remain available when you switch tabs. Shared-change confirmation also stays visible until you confirm or cancel it.
 
 Property controls show utility classes rather than computed CSS values. App stylesheets can override a chosen utility. If a value does not appear, enable **Override app styles for new changes** before choosing it. This writes an important utility and can also override responsive rules. The inspector stays visible while you review the pending change. Keep or undo it before editing another property.
 
@@ -51,7 +55,7 @@ The worktree provider reuses installed dependencies when lockfiles and relevant 
 
 ## Deliver a pass
 
-Keep or undo the change in progress, then use **Deliver**:
+Keep or undo the change in progress, then open the **Deliver** tab:
 
 - **Create branch** creates `neat/<slug>` from the pass base. If your checkout advanced, **Start from** also offers its current commit. Neat applies the kept commits with `git format-patch` and `git am -3` in a separate temporary worktree. Conflicts create no partial branch. Existing names receive a numeric suffix.
 - **Export patch** writes a mailbox patch under `${NEAT_HOME:-~/.neat}/exports` and provides a download link. Apply it on a suitable branch with `git am -3 /path/to/file.patch`.

@@ -7,6 +7,8 @@
 - Revision hashes and updated source tags for consecutive edits.
 - Shared-component impact, explicit confirmation, and deterministic replay without another model call.
 - Local branch delivery, downloadable patch series, and an explicit optional pull request action.
+- Startup progress, preview readiness, explicit Select and Interact modes, and separate Edit, History, and Deliver tabs.
+- An isolated browser acceptance runner with retained traces, screenshots, source provenance, and delivery checks.
 
 ## Forward work
 

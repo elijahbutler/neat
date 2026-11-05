@@ -301,7 +301,8 @@ export async function reuseWorkspaceDependencies(sourceRoot: string, targetRoot:
 export function createWorktreeProvider(options: { homeDir?: string; app?: string; webpack?: boolean } = {}): SandboxProvider {
   return {
     durable: true,
-    async start(id, repo, { editorOrigin, baseCommit, restore }) {
+    async start(id, repo, { editorOrigin, baseCommit, restore, onProgress }) {
+      onProgress?.('preparing');
       if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid session id.');
       const home = options.homeDir ?? sessionHome();
       await reclaimSessions(home);
@@ -315,6 +316,7 @@ export function createWorktreeProvider(options: { homeDir?: string; app?: string
         record.appDir = appDir;
         await persistSession(home, record);
         const sourceApp = resolve(repo, options.app ?? '.');
+        onProgress?.('dependencies');
         const moduleRoots: Array<[string, string]> = [[resolve(repo), resolve(appDir, relative(sourceApp, resolve(repo)))], [sourceApp, appDir]];
         for (const [source, target] of moduleRoots) {
           await copyLocalLocks(source, target);
@@ -349,7 +351,11 @@ export function createWorktreeProvider(options: { homeDir?: string; app?: string
         await excludeFiles(dir, injected.map(file => '/' + relative(dir, file).replaceAll('\\', '/')));
         for (const file of injected) await $`git update-index --skip-worktree -- ${relative(dir, file)}`.cwd(dir).quiet().nothrow();
         // Kept changes go back in after the preview additions are hidden from git and before the first compile.
-        if (restore) await restore({ root: await realpath(dir), appDir: await realpath(appDir) });
+        if (restore) {
+          onProgress?.('restoring');
+          await restore({ root: await realpath(dir), appDir: await realpath(appDir) });
+        }
+        onProgress?.('starting');
         const port = await allocatePort();
         const next = existsSync(join(appDir, 'node_modules', '.bin', 'next')) ? join(appDir, 'node_modules', '.bin', 'next') : join(installRoot, 'node_modules', '.bin', 'next');
         const args = ['dev', ...(options.webpack ? ['--webpack'] : []), '-H', '127.0.0.1', '-p', String(port)];

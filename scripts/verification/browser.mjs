@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { editedHeading, originalHeading } from './fixture.mjs';
 
-export async function poll(label, read, accepts, timeout = 120000) {
+export async function poll(label, read, accepts, timeout = 120000, signal) {
   const deadline = Date.now() + timeout;
   let last;
   while (Date.now() < deadline) {
+    signal?.throwIfAborted();
     try { last = await read(); if (accepts(last)) return last; }
     catch (error) { last = error.message; }
+    signal?.throwIfAborted();
     await Bun.sleep(100);
   }
   throw new Error(`Timed out: ${label}. Last observation: ${JSON.stringify(last)}`);
@@ -18,6 +20,13 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   const heading = () => frame().locator('main h1');
   const padding = () => page.getByLabel('Padding, all sides', { exact: true });
   const steps = () => page.getByRole('list', { name: 'Kept steps' }).locator(':scope > li');
+  const tab = name => page.getByRole('tab', { name, exact: true }).click();
+  const timelineCount = async () => {
+    await tab('History');
+    const count = await steps().count();
+    await tab('Edit');
+    return count;
+  };
   const wait = (label, read, accepts) => poll(label, read, accepts, timeout);
   const visibleText = async (locator, text) => wait(`displayed text ${text}`, () => locator.innerText(), value => value === text);
   const paddingIs = async value => wait(`computed padding ${value}px`, () => heading().evaluate(el => getComputedStyle(el).paddingTop), actual => actual === `${value}px`);
@@ -56,7 +65,7 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   };
   // Delay a real worker response after the worker completes it. The mutation and
   // all checks run normally. Only delivery to the editor is gated.
-  const hold = async (action, trigger, whileHeld) => {
+  const hold = async (action, trigger, whileHeld, patternOverride) => {
     let release;
     const gate = new Promise(resolve => { release = resolve; });
     let ready;
@@ -66,7 +75,7 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
     const completion = new Promise(resolve => { completed = resolve; });
     let entered = false;
     let handlerError;
-    const pattern = new RegExp(`/api/editor/sessions/[^/]+/${action}$`);
+    const pattern = patternOverride ?? new RegExp(`/api/editor/sessions/[^/]+/${action}$`);
     const handler = async route => {
       entered = true;
       try {
@@ -84,7 +93,7 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
       const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`No ${action} response to delay`)), timeout); });
       const status = await Promise.race([observed, deadline]);
       assert.equal(status, 200, `${action} succeeded before its response was delayed`);
-      await whileHeld();
+      await whileHeld(async () => { release(); await completion; if (handlerError) throw handlerError; });
     } finally {
       clearTimeout(timer);
       release();
@@ -99,8 +108,19 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   await page.goto(`${origin}/editor`);
   await visibleText(heading(), originalHeading);
   await wait('native preview ready before selecting', () => page.evaluate(() => window.__neatAcceptanceReadyCount ?? 0), count => count > 0);
+  await wait('selection mode enabled after the preview handshake', () => page.getByRole('button', { name: 'Select', exact: true }).isEnabled(), Boolean);
+  await page.getByRole('tab', { name: 'Edit', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.getByRole('tab', { name: 'History', exact: true }).getAttribute('aria-selected'), 'true');
+  await page.getByRole('heading', { name: 'No kept steps yet', exact: true }).waitFor();
+  await page.keyboard.press('End');
+  assert.equal(await page.getByRole('tab', { name: 'Deliver', exact: true }).getAttribute('aria-selected'), 'true');
+  await page.getByRole('heading', { name: 'Keep a change to deliver', exact: true }).waitFor();
+  await page.keyboard.press('Home');
+  assert.equal(await page.getByRole('tab', { name: 'Edit', exact: true }).getAttribute('aria-selected'), 'true');
   await heading().click();
   await selection();
+  await page.screenshot({ path: join(evidence, 'desktop.png'), fullPage: true });
   await frame().getByText('Hover here while the heading stays selected.', { exact: true }).hover();
   await selection();
   await checkpoint('native selection stays locked while hovering elsewhere', 'selection');
@@ -114,9 +134,37 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   await visibleText(heading(), editedHeading);
   await selection();
   assert.equal(await padding().isDisabled(), true, 'Inspector remains visible and locked during pending review');
-  await keep();
-  await wait('one kept text step', () => steps().count(), n => n === 1);
-  await checkpoint('native text edit, pending inspector, and Keep', 'text');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await selection();
+  const keepButton = page.getByRole('button', { name: 'Keep', exact: true });
+  await keepButton.scrollIntoViewIfNeeded();
+  const pendingBounds = await keepButton.boundingBox();
+  assert.ok(pendingBounds && pendingBounds.x >= 0 && pendingBounds.x + pendingBounds.width <= 391, 'Pending review action fits the phone viewport');
+  await page.screenshot({ path: join(evidence, 'pending-phone.png'), fullPage: true });
+  const previewOrigin = new URL(await page.locator('iframe').getAttribute('src')).origin;
+  await hold('navigation', async () => {
+    await page.getByLabel('Page', { exact: true }).fill('/about');
+    await page.getByLabel('Page', { exact: true }).press('Enter');
+  }, async releaseNavigation => {
+    await hold('keep', () => page.getByRole('button', { name: 'Keep', exact: true }).click(), async () => {
+      await releaseNavigation();
+      await page.locator('.preview-connection').waitFor({ state: 'hidden' });
+      await wait('new preview document before Keep reply', async () => {
+        const iframe = await page.locator('iframe').elementHandle();
+        return new URL((await iframe.contentFrame()).url()).pathname;
+      }, value => value === '/about');
+    });
+  }, url => url.origin === previewOrigin && url.pathname === '/about');
+  await settled();
+  await poll('previous route selection stays cleared after late Keep reply', () => page.locator('.selection-summary h2').innerText(), value => value === 'Nothing selected', 10000);
+  assert.equal(await padding().count(), 0, 'The About page never restores home-page property controls');
+  await page.getByLabel('Page', { exact: true }).fill('/');
+  await page.getByLabel('Page', { exact: true }).press('Enter');
+  await heading().click();
+  await selection();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await wait('one kept text step', timelineCount, n => n === 1);
+  await checkpoint('native text edit, pending review, and Keep across a delayed route navigation', 'text');
 
   await paddingIs(17);
   await page.getByLabel('Override app styles for new changes', { exact: true }).check();
@@ -151,9 +199,11 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   await paddingIs(24);
   await checkpoint('full iframe reload while inspection is delayed preserves selection and the next edit', 'reloadDuringInspection');
 
+  await tab('History');
   await steps().last().getByRole('button', { name: /^Undo step / }).click();
   await steps().last().getByText(/^Undone ·/).waitFor();
   assert.equal(await steps().last().getByRole('button', { name: /^Undo step / }).count(), 0, 'Undone step has no Undo action');
+  await tab('Edit');
   await paddingIs(17);
   await wait('controls after latest-step undo', () => padding().isEnabled(), Boolean);
   await checkpoint('latest kept Undo restores the preview and marks its timeline row Undone', 'keptUndo');
@@ -187,12 +237,16 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   await pending();
   await paddingIs(24);
   await keep();
+  await tab('History');
   await steps().first().getByText('Code and checks', { exact: true }).click();
   await steps().first().getByText(/Not run yet:.*lint.*render/).waitFor();
   assert.match(await steps().first().locator('pre').innerText(), /A kept browser edit/);
   await checkpoint('timeline diff and honest check labels', 'timeline');
+  await tab('Edit');
 
   await frame().locator('main h2').click();
+  await page.getByRole('heading', { name: '<AcceptanceBadge>', exact: true }).waitFor();
+  await wait('shared component Ask ready after selection inspection', () => page.locator('#ask').isEnabled(), Boolean);
   const callsBefore = provider.calls.length;
   await ask('acceptance shared label');
   const confirmation = page.locator('section[aria-labelledby="shared-title"]');
@@ -215,7 +269,7 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   await wait('shared selection refreshed after Keep', () => page.locator('#ask').isEnabled(), Boolean);
   await checkpoint('shared impact, Cancel, and deterministic confirmation through production model adapter', 'sharedConfirmation');
 
-  await page.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.getByRole('button', { name: 'Interact', exact: true }).click();
   await frame().getByRole('link', { name: 'About', exact: true }).click();
   await visibleText(frame().locator('main h2'), 'Confirmed shared label');
   await wait('native navigation to About', async () => {
@@ -228,19 +282,20 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   await page.getByRole('button', { name: 'Select', exact: true }).click();
   await checkpoint('native route navigation displays the confirmed shared change on About', 'routeNavigation');
 
-  const kept = await steps().count();
+  const kept = await timelineCount();
   await page.reload();
   await visibleText(heading(), editedHeading);
   await paddingIs(24);
-  await wait('timeline survives browser reload', () => steps().count(), n => n === kept);
+  await wait('timeline survives browser reload', timelineCount, n => n === kept);
   await restart();
   await page.goto(`${origin}/editor`);
   await visibleText(heading(), editedHeading);
   await paddingIs(24);
   await visibleText(frame().locator('main h2'), 'Confirmed shared label');
-  await wait('timeline survives worker restart', () => steps().count(), n => n === kept);
+  await wait('timeline survives worker restart', timelineCount, n => n === kept);
   await checkpoint('browser reload and real CLI restart restore kept pass', 'restart');
 
+  await tab('Deliver');
   await page.getByLabel('Branch name', { exact: true }).fill('browser-acceptance');
   await page.getByRole('button', { name: 'Create branch', exact: true }).click();
   await page.getByText('neat/browser-acceptance', { exact: true }).waitFor();
@@ -260,5 +315,50 @@ export async function exerciseEditor({ page, origin, evidence, timeout, checkpoi
   await page.keyboard.press('Tab');
   assert.equal(await page.getByRole('button', { name: 'Export patch', exact: true }).evaluate(el => el === document.activeElement), true);
   await page.screenshot({ path: join(evidence, 'final.png'), fullPage: true });
+  await page.setViewportSize({ width: 834, height: 1112 });
+  await deliver.scrollIntoViewIfNeeded();
+  const tabletBounds = await deliver.boundingBox();
+  assert.ok(tabletBounds && tabletBounds.x >= 0 && tabletBounds.x + tabletBounds.width <= 835, 'Delivery panel fits the tablet viewport');
+  await page.screenshot({ path: join(evidence, 'tablet.png'), fullPage: true });
   await checkpoint('native branch and patch delivery, mobile fit, and keyboard navigation', 'delivery');
+}
+
+export async function exerciseWorkspaceRecovery({ page, origin, evidence, timeout, stopPreview }) {
+  const failures = [];
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const frame = () => page.frameLocator('iframe');
+  await page.getByLabel('Page', { exact: true }).fill('/?view=compact#team');
+  await page.getByLabel('Page', { exact: true }).press('Enter');
+  await poll('preview connected on query route', () => page.getByRole('button', { name: 'Select', exact: true }).isEnabled(), Boolean, timeout);
+  let element = await page.locator('iframe').elementHandle();
+  let child = await element.contentFrame();
+  const before = await child.evaluate(() => performance.timeOrigin);
+  await page.getByRole('button', { name: 'Reload preview', exact: true }).click();
+  await poll('native reload completed', async () => {
+    element = await page.locator('iframe').elementHandle();
+    child = await element.contentFrame();
+    return (await child.evaluate(() => performance.timeOrigin)) !== before && await page.getByRole('button', { name: 'Select', exact: true }).isEnabled();
+  }, Boolean, timeout);
+  const destination = new URL(child.url());
+  if (`${destination.pathname}${destination.search}${destination.hash}` !== '/?view=compact#team') failures.push(`Reload changed the URL to ${destination.pathname}${destination.search}${destination.hash}`);
+
+  const stopped = await stopPreview();
+  await page.reload();
+  await page.getByRole('heading', { name: "The preview didn't start.", exact: true }).waitFor();
+  await page.getByText('Startup logs', { exact: true }).click();
+  try {
+    await poll('available startup logs displayed', () => page.locator('.preview-startup pre').textContent(), text => text === stopped.logs, 10000);
+  } catch (error) { failures.push(error.message); }
+  await page.screenshot({ path: join(evidence, 'failed-preview.png'), fullPage: true });
+  assert.deepEqual(failures, [], 'Reload preserves app URL and failed previews retain their actual logs');
+
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await frame().locator('main h1').waitFor();
+  await poll('retry restores the preview bridge', () => page.getByRole('button', { name: 'Select', exact: true }).isEnabled(), Boolean, timeout);
+  assert.equal(await frame().locator('main h1').innerText(), editedHeading);
+  const sessions = (await (await fetch(`${origin}/api/editor/sessions`)).json()).sessions;
+  assert.equal(sessions.length, 1, 'Retry leaves one session');
+  assert.notEqual(sessions[0].id, stopped.sessionId, 'Retry replaces the failed session');
+  await page.screenshot({ path: join(evidence, 'retried-preview.png'), fullPage: true });
+  return sessions[0];
 }

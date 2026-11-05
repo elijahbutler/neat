@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { prepareTaggedProject, resolveNextVersion } from '../tagging/inject';
 import { bridgeSource } from './bridge';
 import { COPY_SKIP as SKIP, runDockerJob, type JobResult, type JobSpec } from './job';
+import type { PreparationPhase } from '../worker/startup';
 
 export type { JobResult, JobSpec, JobStep, JobStepResult } from './job';
 
@@ -26,6 +27,7 @@ export type SandboxState = 'starting' | 'ready' | 'stopped' | 'failed';
 /** What a sandbox backend has to do. The docker one runs on this Mac now and on the sandbox server later. */
 export interface SandboxStartOptions {
   editorOrigin: string;
+  onProgress?: (phase: PreparationPhase) => void;
   /** Check out this commit instead of the repository's HEAD. Providers that can't (Docker copies the working tree) ignore it. */
   baseCommit?: string;
   /**

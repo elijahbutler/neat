@@ -1,9 +1,104 @@
 import { expect, test } from 'bun:test';
 import { createWorker } from './server';
-import type { SandboxProvider } from '../sandbox/docker';
+import type { SandboxProvider, SandboxStartOptions } from '../sandbox/docker';
 
 const origin = 'http://127.0.0.1:44317';
 const request = (path: string, method = 'GET', body?: unknown, headers: Record<string, string> = {}) => new Request(origin + path, { method, headers: { host: '127.0.0.1:44317', ...headers }, body: body ? JSON.stringify(body) : undefined });
+
+test('startup reports preparation boundaries while opening, readiness, and stop', async () => {
+  let release: () => void = () => {};
+  let enter: (options: SandboxStartOptions) => void = () => {};
+  const entered = new Promise<SandboxStartOptions>(resolve => { enter = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const provider: SandboxProvider = {
+    async start(id, _repo, opts) { enter(opts); await gate; return { id, dir: '/session', port: 4401, previewUrl: 'http://127.0.0.1:4401' }; },
+    async state() { return 'ready'; }, async logs() { return ''; },
+    async stop() {}, async runJob() { throw new Error('unused'); },
+  };
+  const worker = createWorker({ repo: '/chosen/repo', origin, shell: new Map(), provider });
+  const status = async () => (await worker.fetch(request('/api/editor/startup'))).json();
+  try {
+    expect(await status()).toEqual({ phase: 'idle' });
+    const opening = worker.fetch(request('/api/editor/sessions', 'POST', { fixture: '/chosen/repo' }));
+    const opts = await entered;
+    const initial = await status();
+    expect(initial.phase).toBe('preparing');
+    expect(Number.isNaN(Date.parse(initial.startedAt))).toBe(false);
+    for (const phase of ['dependencies', 'restoring', 'starting'] as const) {
+      opts.onProgress?.(phase);
+      expect(await status()).toEqual({ phase, startedAt: initial.startedAt });
+    }
+    release();
+    const opened = await (await opening).json();
+    expect(await status()).toEqual({ phase: 'starting', startedAt: initial.startedAt });
+    await worker.fetch(request(`/api/editor/sessions/${opened.id}`));
+    expect(await status()).toEqual({ phase: 'ready', startedAt: initial.startedAt });
+    expect((await worker.fetch(request('/api/editor/startup', 'GET', undefined, { origin: 'https://other.example' }))).status).toBe(403);
+    await worker.fetch(request(`/api/editor/sessions/${opened.id}`, 'DELETE'));
+    expect(await status()).toEqual({ phase: 'idle' });
+  } finally { release(); await worker.close(); }
+});
+
+test('startup failures expose a fixed message and permit a retry', async () => {
+  let attempts = 0;
+  const provider: SandboxProvider = {
+    async start(id) {
+      if (++attempts === 1) throw new Error('/private/machine/folder secret-value');
+      return { id, dir: '/session', port: 4401, previewUrl: 'http://127.0.0.1:4401' };
+    },
+    async state() { return 'failed'; }, async logs() { return ''; },
+    async stop() {}, async runJob() { throw new Error('unused'); },
+  };
+  const worker = createWorker({ repo: '/chosen/repo', origin, shell: new Map(), provider });
+  try {
+    const failure = await worker.fetch(request('/api/editor/sessions', 'POST', { fixture: '/chosen/repo' }));
+    expect(failure.status).toBe(500);
+    expect(await failure.text()).not.toContain('secret-value');
+    const failed = await (await worker.fetch(request('/api/editor/startup'))).json();
+    expect(failed).toEqual({ phase: 'failed', startedAt: expect.any(String), error: 'Could not prepare the preview. Check the terminal and try again.' });
+    const retry = await worker.fetch(request('/api/editor/sessions', 'POST', { fixture: '/chosen/repo' }));
+    expect(retry.status).toBe(201);
+    const opened = await retry.json();
+    await worker.fetch(request(`/api/editor/sessions/${opened.id}`));
+    expect(await (await worker.fetch(request('/api/editor/startup'))).json()).toEqual({ phase: 'failed', startedAt: expect.any(String), error: 'The preview stopped. Check the terminal and start it again.' });
+  } finally { await worker.close(); }
+});
+
+test('a delayed status from a stopped session cannot overwrite its replacement startup', async () => {
+  let releaseState: () => void = () => {};
+  let enteredState: () => void = () => {};
+  let releaseStart: () => void = () => {};
+  let enteredStart: () => void = () => {};
+  const reading = new Promise<void>(resolve => { enteredState = resolve; });
+  const stateGate = new Promise<void>(resolve => { releaseState = resolve; });
+  const starting = new Promise<void>(resolve => { enteredStart = resolve; });
+  const startGate = new Promise<void>(resolve => { releaseStart = resolve; });
+  let starts = 0;
+  const provider: SandboxProvider = {
+    async start(id, _repo, opts) {
+      if (++starts === 2) { opts.onProgress?.('dependencies'); enteredStart(); await startGate; }
+      return { id, dir: '/session', port: 4401, previewUrl: 'http://127.0.0.1:4401' };
+    },
+    async state() { enteredState(); await stateGate; return 'ready'; }, async logs() { return ''; },
+    async stop() {}, async runJob() { throw new Error('unused'); },
+  };
+  const worker = createWorker({ repo: '/chosen/repo', origin, shell: new Map(), provider });
+  let replacement: Promise<Response> | undefined;
+  try {
+    const first = await (await worker.fetch(request('/api/editor/sessions', 'POST', { fixture: '/chosen/repo' }))).json();
+    const oldStatus = worker.fetch(request(`/api/editor/sessions/${first.id}`));
+    await reading;
+    await worker.fetch(request(`/api/editor/sessions/${first.id}`, 'DELETE'));
+    replacement = worker.fetch(request('/api/editor/sessions', 'POST', { fixture: '/chosen/repo' }));
+    await starting;
+    releaseState();
+    await oldStatus;
+    expect((await (await worker.fetch(request('/api/editor/startup'))).json()).phase).toBe('dependencies');
+    releaseStart();
+    expect((await replacement).status).toBe(201);
+    expect((await (await worker.fetch(request('/api/editor/startup'))).json()).phase).toBe('starting');
+  } finally { releaseState(); releaseStart(); await replacement; await worker.close(); }
+});
 test('serves shell, arbitrary repo API, and sessions in-process without hosted auth', async () => {
   const stopped: string[] = [];
   const provider: SandboxProvider = {

@@ -25,6 +25,8 @@ export function bridgeSource(editorOrigin: string): string {
   var committed = null;
 
   function send(message) { window.parent.postMessage(message, EDITOR); }
+  function pageUrl() { return location.pathname + location.search + location.hash; }
+  function sendRoute(type) { send({ type: type, route: location.pathname, url: pageUrl() }); }
 
   function tagged(el) {
     while (el && el.nodeType === 1) {
@@ -247,9 +249,11 @@ export function bridgeSource(editorOrigin: string): string {
   }, true);
 
   window.addEventListener('scroll', function () { if (selected && selecting && !editing) show(selected, nameOf(selected)); }, true);
+  window.addEventListener('resize', function () { if (selected && selecting && !editing) restoreSelection(false); });
 
   window.addEventListener('message', function (e) {
     if (e.origin !== EDITOR || !e.data || typeof e.data.type !== 'string') return;
+    if (e.data.type === 'neat:hello') sendRoute('neat:ready');
     if (e.data.type === 'neat:busy') { busy = !!e.data.busy; if (busy) { confirmedTag = null; asked = null; finishEditing(false); } }
     if (e.data.type === 'neat:mode') {
       selecting = !!e.data.selecting;
@@ -284,9 +288,9 @@ export function bridgeSource(editorOrigin: string): string {
 
   var last = '';
   setInterval(function () {
-    if (location.pathname !== last) { last = location.pathname; send({ type: 'neat:route', route: last }); }
+    if (pageUrl() !== last) { last = pageUrl(); sendRoute('neat:route'); }
   }, 300);
-  send({ type: 'neat:ready', route: location.pathname });
+  sendRoute('neat:ready');
 })();
 `;
 }
