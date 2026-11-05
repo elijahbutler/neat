@@ -18,10 +18,10 @@ interface Statement {
 }
 
 function wrapper(kind: 'esm' | 'cjs', opts: TaggingBundle & { root: string }): string {
-  // A plain absolute path, not a file:// URL: Next compiles .ts configs to CommonJS, which turns import() into require().
+  // Next compiles TypeScript configs to CommonJS. Keep the absolute path in a variable so compiler aliases cannot rewrite it.
   const url = JSON.stringify(kind === 'cjs' ? opts.withTaggingCjsPath ?? opts.withTaggingPath : opts.withTaggingPath);
   const options = JSON.stringify({ loaderPath: opts.loaderPath, root: opts.root });
-  const body = `{\n  const { withNeatTagging } = await import(${url});\n  return withNeatTagging(${ORIGINAL}, ${options})(phase, context);\n}\n`;
+  const body = `{\n  const neatTaggingPath = ${url};\n  const { withNeatTagging } = await import(neatTaggingPath);\n  return withNeatTagging(${ORIGINAL}, ${options})(phase, context);\n}\n`;
   return kind === 'esm'
     ? `\nexport default async function neatTaggedConfig(phase, context) ${body}`
     : `\nmodule.exports = async function neatTaggedConfig(phase, context) ${body}`;
