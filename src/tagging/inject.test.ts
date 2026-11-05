@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import { buildTaggingBundle } from './bundle';
 import { injectTagging, resolveNextVersion, rewriteNextConfig } from './inject';
 
@@ -59,6 +60,34 @@ describe('rewriteNextConfig', () => {
 });
 
 describe('injectTagging', () => {
+  test('a compiled TypeScript config loads Neat independently of compiler path aliases', async () => {
+    const project = await mkdtemp(join(dir, 'compiler-paths-'));
+    await mkdir(join(project, 'node_modules'));
+    const localRequire = createRequire(import.meta.url);
+    for (const name of ['next', 'typescript']) {
+      const packagePath = localRequire.resolve(`${name}/package.json`);
+      await symlink(join(packagePath, '..'), join(project, 'node_modules', name));
+    }
+    const bundle = await buildTaggingBundle(join(project, '.neat'));
+    await writeFile(join(project, 'wrong.cjs'), 'throw new Error("Compiler aliases must not replace the injected loader");');
+    await writeFile(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { paths: { [bundle.withTaggingCjsPath!]: ['./wrong.cjs'] } } }));
+    await writeFile(join(project, 'next.config.ts'), 'export default { poweredByHeader: false };');
+    await injectTagging(project, bundle);
+    // Release the compiler's native bindings when this test ends instead of retaining them through the whole suite.
+    const script = `(async () => {
+      const { loadBindings } = require('next/dist/build/swc');
+      await loadBindings();
+      const { transpileConfig } = require('next/dist/build/next-config-ts/transpile-config');
+      const config = await transpileConfig({ nextConfigPath: ${JSON.stringify(join(project, 'next.config.ts'))}, dir: ${JSON.stringify(project)} });
+      const result = await config.default('phase-development-server', { defaultConfig: {} });
+      process.stdout.write(String(result.poweredByHeader));
+    })().catch(error => { console.error(error); process.exitCode = 1; });`;
+    const child = Bun.spawn(['node', '--eval', script], { cwd: project, stdout: 'pipe', stderr: 'pipe' });
+    const [out, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    expect(code, errors).toBe(0);
+    expect(out).toBe('false');
+  }, 120000);
+
   test('writes next.config.mjs when the project has none', async () => {
     const project = await mkdtemp(join(dir, 'p-'));
     expect(await injectTagging(project, { loaderPath: '/l.cjs', withTaggingPath: stubPath })).toBe('next.config.mjs');
