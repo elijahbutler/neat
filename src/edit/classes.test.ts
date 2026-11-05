@@ -387,3 +387,12 @@ describe('spread props and className', () => {
     expect(after(7)).toBe('export function E(props: Plain) { return <div className="p-4 px-6" {...props}>e</div>; }');
   });
 });
+
+
+test('explicit app-style overrides use important utilities without changing responsive classes', () => {
+  expect(changeProperty(['custom-label', 'md:py-8'], 'paddingY', '4', o, 'important')).toEqual([{ from: '', to: '!py-4' }]);
+  expect(changeProperty(['p-4'], 'paddingY', '4', o, 'important')).toEqual([{ from: '', to: '!py-4' }]);
+  expect(changeProperty(['py-2'], 'paddingY', '4', o, 'important')).toEqual([{ from: 'py-2', to: '!py-4' }]);
+  expect(changeProperty(['py-2!'], 'paddingY', '4', o, 'important')).toEqual([{ from: 'py-2!', to: 'py-4!' }]);
+  expect(changeProperty(['!py-2'], 'paddingY', null, o, 'important')).toEqual([{ from: '!py-2', to: '' }]);
+});

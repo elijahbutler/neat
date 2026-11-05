@@ -25,11 +25,13 @@ The preview starts from a committed revision in a detached Git worktree. Your or
 
 ## Make and keep changes
 
-1. Click an element in the preview to inspect it. Double-click plain text to edit it in place. Use the property panel for supported classes and component options.
+1. Click an element in the preview to inspect it. Its outline stays locked while you hover elsewhere. Click another element to switch, or press Escape in the preview to release the selection. Double-click plain text to edit it in place. Use the property panel for supported classes and component options.
 2. Review the preview change, then choose **Keep** or **Undo**. An applied change is not saved until you keep it.
 3. To use Ask, set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before launching. Direct edits need no key. Keep keys outside version control.
 4. If a change reaches a component definition, review its affected routes and source call sites. **Change everywhere** applies the saved operations without another model call. **Cancel** writes nothing.
 5. Expand **Code and checks** in the timeline to inspect a step's diff and check results. Each kept step has its own Undo action.
+
+Property controls show utility classes rather than computed CSS values. App stylesheets can override a chosen utility. If a value does not appear, enable **Override app styles for new changes** before choosing it. This writes an important utility and can also override responsive rules. The inspector stays visible while you review the pending change. Keep or undo it before editing another property.
 
 Checks compare new syntax and type diagnostics, imports, and variant values against the code before the edit. They cover changed files and consumers found through the JSX render graph. Existing diagnostics do not block an otherwise valid edit. Lint and render checks are marked as not run; the editor does not claim to have run the application's full validation suite.
 

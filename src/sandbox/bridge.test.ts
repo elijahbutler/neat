@@ -82,6 +82,36 @@ function fakePage() {
   };
 }
 
+describe('locked selection', () => {
+  test('keeps the clicked outline while hovering another element, until Escape releases it', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    const neighbor = page.element('DIV', { 'data-nl-src': 'app/page.tsx:2:1' }, 'Neighbor');
+    page.dom('mousemove', { target: neighbor });
+    expect(page.outline().label).toBe('div  page.tsx:2:1');
+    page.dom('click', { target: heading });
+    page.dom('mousemove', { target: neighbor });
+    expect(page.outline()).toMatchObject({ display: 'block', label: 'h1  page.tsx:1:1' });
+    page.dom('keydown', { key: 'Escape', target: heading });
+    expect(page.last()).toEqual({ type: 'neat:deselect' });
+    page.dom('mousemove', { target: neighbor });
+    expect(page.outline().label).toBe('div  page.tsx:2:1');
+  });
+
+  test('ignores new selections while a source change is saving', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    const neighbor = page.element('DIV', { 'data-nl-src': 'app/page.tsx:2:1' }, 'Neighbor');
+    page.dom('click', { target: heading });
+    page.fromEditor({ type: 'neat:busy', busy: true });
+    page.dom('click', { target: neighbor });
+    expect(page.last()).toMatchObject({ type: 'neat:select', target: { src: 'app/page.tsx:1:1' } });
+    page.fromEditor({ type: 'neat:busy', busy: false });
+    page.dom('click', { target: neighbor });
+    expect(page.last()).toMatchObject({ type: 'neat:select', target: { src: 'app/page.tsx:2:1' } });
+  });
+});
+
 describe('following source tags through hot reload', () => {
   test('waits for the selected element instead of outlining its old neighbor', () => {
     const page = fakePage();
@@ -96,7 +126,7 @@ describe('following source tags through hot reload', () => {
     expect(page.outline()).toMatchObject({ display: 'block', label: 'h1  page.tsx:2:1' });
   });
 
-  test('uses the confirmed tag to rebind a replaced node', () => {
+  test('retains the confirmed tag when hot reload replaces a node after the response', () => {
     const page = fakePage();
     const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
     page.dom('click', { target: heading });
@@ -105,8 +135,6 @@ describe('following source tags through hot reload', () => {
     const replacement = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Updated heading');
     replacement.getBoundingClientRect = () => ({ x: 80, y: 40, left: 80, top: 40, width: 10, height: 10 });
     page.mutate();
-    expect(page.outline().display).toBe('none');
-    page.fromEditor({ type: 'neat:reselect', tag: 'app/page.tsx:1:1' });
     expect(page.outline()).toMatchObject({ display: 'block', left: '80px', label: 'h1  page.tsx:1:1' });
   });
 
@@ -170,6 +198,23 @@ describe('editing text in place', () => {
 
     page.fromEditor({ type: 'neat:text-edit', key: KEY });
     expect(heading.getAttribute('contenteditable')).toBe('plaintext-only');
+  });
+
+  test('a source save invalidates delayed text approval and cancels active typing', () => {
+    const { page, heading } = start();
+    page.fromEditor({ type: 'neat:busy', busy: true });
+    page.fromEditor({ type: 'neat:text-edit', key: KEY });
+    page.fromEditor({ type: 'neat:busy', busy: false });
+    page.fromEditor({ type: 'neat:text-edit', key: KEY });
+    expect(heading.hasAttribute('contenteditable')).toBe(false);
+    page.dom('dblclick', { target: heading });
+    page.fromEditor({ type: 'neat:text-edit', key: KEY });
+    expect(heading.getAttribute('contenteditable')).toBe('plaintext-only');
+    heading.textContent = 'Unsaved typing';
+    page.fromEditor({ type: 'neat:busy', busy: true });
+    expect(heading.textContent).toBe('Four people, one studio');
+    expect(heading.hasAttribute('contenteditable')).toBe(false);
+    expect(page.last()).toMatchObject({ type: 'neat:text-cancel', key: KEY });
   });
 
   test('Enter commits the typed text with its whitespace tidied', () => {
