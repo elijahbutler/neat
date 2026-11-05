@@ -126,6 +126,7 @@ export function EditorApp() {
   const [textEdit] = useState(textEditTracker);
   const [mutating, setMutating] = useState(false);
   const mutationActive = useRef(false);
+  const confirmedReselection = useRef<string | null>(null);
   const [started, setStarted] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const frame = useRef<HTMLIFrameElement>(null);
@@ -163,6 +164,7 @@ export function EditorApp() {
   const beginChange = useCallback(() => {
     if (mutationActive.current) return false;
     mutationActive.current = true;
+    confirmedReselection.current = null;
     setMutating(true);
     textEdit.ask();
     post({ type: 'neat:busy', busy: true });
@@ -173,6 +175,10 @@ export function EditorApp() {
     mutationActive.current = false;
     setMutating(false);
     post({ type: 'neat:busy', busy: false });
+    // The iframe can reload while inspection is still refreshing. Rebind once the mutation is settled.
+    const tag = confirmedReselection.current;
+    confirmedReselection.current = null;
+    if (tag) post({ type: 'neat:reselect', tag });
   }, [post]);
 
   const inspect = useCallback(async (tag: string, at: string, ancestors: Target['ancestors']) => {
@@ -195,7 +201,7 @@ export function EditorApp() {
       // The change can move lines and columns. The selection follows its element, so the panel is back on the same
       // element once the change is kept or undone, and the next tweak targets the right place.
       setNotice(null); setSession(res.session); setProposal(res.session.proposal);
-      if (held) followSelection(held, res.moved);
+      if (held) await followSelection(held, res.moved);
       return true;
     } catch (e) { setNotice((e as Error).message); return false; }
     finally { endChange(); }
@@ -291,7 +297,7 @@ export function EditorApp() {
       else {
         setSession(res.session); setProposal(res.session.proposal); setInstruction('');
         // The element stays selected, at the tag it has now, the way it does after a direct edit.
-        followSelection(held, res.moved);
+        await followSelection(held, res.moved);
       }
     } catch (err) { setAskError((err as Error).message); }
     finally { setAsking(false); setStarted(null); endChange(); }
@@ -309,7 +315,7 @@ export function EditorApp() {
       const kind = proposal.kind;
       setSession(res.session); setProposal(null); setNotice(null);
       if (kind === 'ask') setInstruction('');
-      followSelection(held, res.moved);
+      await followSelection(held, res.moved);
     } catch (err) {
       const code = (err as { code?: string }).code;
       // A proposal that timed out, went stale, or is gone can't be confirmed again. Anything else can be retried.
@@ -330,7 +336,7 @@ export function EditorApp() {
   }
 
   /** Reselect the element after a change, at the tag it now has. Without one the selection is cleared. */
-  function followSelection(held: Target | null, moved: Record<string, string | null> | undefined) {
+  async function followSelection(held: Target | null, moved: Record<string, string | null> | undefined) {
     const next = held && moved ? moveTarget(held, moved) : null;
     const tag = next && (next.inst ?? next.src);
     if (!next || !tag) {
@@ -339,8 +345,9 @@ export function EditorApp() {
       return;
     }
     setTarget(next);
+    confirmedReselection.current = tag;
     post({ type: 'neat:reselect', tag });
-    void inspect(tag, route, next.ancestors);
+    await inspect(tag, route, next.ancestors);
   }
 
   async function settle(action: 'keep' | 'undo') {
@@ -351,7 +358,7 @@ export function EditorApp() {
       const done = await api<Settled>(`sessions/${session.id}/${action}`, { body: { tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
       setSession(done);
       // The same element stays selected, read again so the controls show the code as it is now.
-      if (held) followSelection(held, done.moved);
+      if (held) await followSelection(held, done.moved);
       else { setInspection(null); setTarget(null); post({ type: 'neat:clear' }); }
     }
     catch (e) { setAskError((e as Error).message); }
@@ -367,7 +374,7 @@ export function EditorApp() {
     try {
       const done = await api<Settled>(`sessions/${session.id}/undo`, { body: { step: step.id, tag: held ? held.inst ?? held.src : undefined, tags: held ? targetTags(held) : [] } });
       setSession(done);
-      if (held) followSelection(held, done.moved);
+      if (held) await followSelection(held, done.moved);
     } catch (e) { setNotice((e as Error).message); }
     finally { setUndoing(null); endChange(); }
   }

@@ -168,7 +168,8 @@ async function revertPending(s: Session, h: History, pending: Pending) {
     await requireState(h.wt, pending.changes.map((c) => ({ file: c.file, hash: sha256(c.after) })), false);
     await writeApp(h.wt, pending.changes.map((c) => ({ file: c.file, text: c.before })));
   } catch (error) { forgetProject(s); throw error; }
-  for (const c of pending.changes) sourceFile(s, c.file)?.replaceWithText(c.before);
+  // A refused undo can discard the cached project. Refresh from the restored disk in that case.
+  if (s.project) for (const c of pending.changes) sourceFile(s, c.file)?.replaceWithText(c.before);
   refresh(s);
 }
 

@@ -1,0 +1,130 @@
+import { describe, expect, test } from 'bun:test';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { parseOptions, repository } from './verification/options.mjs';
+import { git, gitEnvironment, snapshot } from './verification/fixture.mjs';
+import { cliArguments, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
+
+const driver = join(tmpdir(), 'browser-driver', 'index.mjs');
+
+describe('browser acceptance command', () => {
+  test('parses a dedicated run without inheriting model or port environment settings', () => {
+    const options = parseOptions([
+      '--port', '4470', '--provider-port', '4472', '--timeout', '60000',
+      '--evidence', join(tmpdir(), 'acceptance-evidence'), '--headed',
+      '--browser-executable', join(tmpdir(), 'browser', 'chrome'),
+    ], { NEAT_BROWSER_DRIVER: driver, OPENAI_API_KEY: 'must-not-be-returned', PORT: '4400' });
+    expect(options).toEqual({
+      port: 4470, providerPort: 4472, timeout: 60000, headed: true,
+      evidence: join(tmpdir(), 'acceptance-evidence'), executable: join(tmpdir(), 'browser', 'chrome'), driver,
+    });
+  });
+
+  test('rejects protected or colliding ports while accepting a dedicated pair', () => {
+    for (const port of ['3000', '4100', '4317', '4400', '4459', '65536', '4460garbage']) {
+      expect(() => parseOptions(['--port', port], { NEAT_BROWSER_DRIVER: driver })).toThrow();
+    }
+    expect(() => parseOptions(['--provider-port', '4460'], { NEAT_BROWSER_DRIVER: driver })).toThrow('must differ');
+    expect(parseOptions(['--port', '4480', '--provider-port', '4482'], { NEAT_BROWSER_DRIVER: driver }).port).toBe(4480);
+  });
+
+  test('requires the browser installation and evidence to stay outside the checkout', () => {
+    expect(() => parseOptions([], {})).toThrow('absolute path');
+    expect(() => parseOptions([], { NEAT_BROWSER_DRIVER: 'relative-driver.mjs' })).toThrow('absolute path');
+    expect(() => parseOptions([], { NEAT_BROWSER_DRIVER: join(repository, 'node_modules/driver.mjs') })).toThrow('outside this checkout');
+    expect(() => parseOptions(['--evidence', join(repository, 'evidence')], { NEAT_BROWSER_DRIVER: driver })).toThrow('outside this checkout');
+    expect(parseOptions([], { NEAT_BROWSER_DRIVER: driver }).driver).toBe(driver);
+  });
+
+  test('rejects removed allocator overrides and missing option values', () => {
+    expect(() => parseOptions(['--preview-port', '4471'], { NEAT_BROWSER_DRIVER: driver })).toThrow('Unknown option');
+    expect(() => parseOptions(['--evidence'], { NEAT_BROWSER_DRIVER: driver })).toThrow('needs a value');
+    expect(() => parseOptions(['--timeout', '0'], { NEAT_BROWSER_DRIVER: driver })).toThrow('between 1000 and 600000');
+    expect(parseOptions(['--timeout', '30000'], { NEAT_BROWSER_DRIVER: driver }).timeout).toBe(30000);
+  });
+});
+
+describe('browser acceptance isolation', () => {
+  test('CLI invocation prevents Bun from loading credentials from a repository env file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'neat-env-test-'));
+    try {
+      await writeFile(join(root, '.env'), 'LLM_API_KEY=dummy-dotenv-key\nLLM_BASE_URL=https://invalid.example.test\n');
+      const probe = 'process.stdout.write(JSON.stringify({key:process.env.LLM_API_KEY??null,base:process.env.LLM_BASE_URL??null,fake:process.env.OPENAI_API_KEY}))';
+      const readEnv = async (args: string[]) => {
+        const child = Bun.spawn([process.execPath, ...args, '--eval', probe], {
+          cwd: root, env: { ...gitEnvironment(), OPENAI_API_KEY: 'fake-script-key' }, stdout: 'pipe', stderr: 'pipe',
+        });
+        const output = await new Response(child.stdout).text();
+        expect(await child.exited).toBe(0);
+        return JSON.parse(output);
+      };
+      expect(await readEnv([])).toEqual({ key: 'dummy-dotenv-key', base: 'https://invalid.example.test', fake: 'fake-script-key' });
+      expect(await readEnv(cliArguments('/fixture', 4460).slice(0, 1))).toEqual({ key: null, base: null, fake: 'fake-script-key' });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  test('Git ignores inherited repository, worktree, and index overrides', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'neat-git-test-'));
+    const original = Object.fromEntries(['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0'].map(key => [key, process.env[key]]));
+    try {
+      const intended = join(root, 'intended'), other = join(root, 'other');
+      await mkdir(intended); await mkdir(other);
+      await git(intended, 'init', '-b', 'intended'); await git(other, 'init', '-b', 'other');
+      await writeFile(join(intended, 'chosen.txt'), 'intended bytes\n');
+      await writeFile(join(other, 'chosen.txt'), 'other bytes\n');
+      const externalIndex = join(root, 'other-index');
+      await writeFile(externalIndex, 'sentinel bytes');
+      Object.assign(process.env, { GIT_DIR: join(other, '.git'), GIT_WORK_TREE: other, GIT_INDEX_FILE: externalIndex, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.bare', GIT_CONFIG_VALUE_0: 'true' });
+      await git(intended, 'add', 'chosen.txt');
+      expect(await git(intended, 'show', ':chosen.txt')).toBe('intended bytes');
+      expect(await git(other, 'ls-files')).toBe('');
+      expect(await readFile(externalIndex, 'utf8')).toBe('sentinel bytes');
+      expect(await readFile(join(other, 'chosen.txt'), 'utf8')).toBe('other bytes\n');
+    } finally {
+      for (const [key, value] of Object.entries(original)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('snapshot detects changed untracked bytes when status, HEAD, and index do not change', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'neat-snapshot-test-'));
+    try {
+      await git(root, 'init', '-b', 'input');
+      await git(root, 'config', 'user.name', 'Acceptance test');
+      await git(root, 'config', 'user.email', 'acceptance@example.test');
+      await writeFile(join(root, 'tracked.txt'), 'base\n');
+      await git(root, 'add', '.'); await git(root, 'commit', '-m', 'Fixture');
+      await writeFile(join(root, 'untracked-input.txt'), 'before\n');
+      const before = await snapshot(root);
+      await writeFile(join(root, 'untracked-input.txt'), 'after\n');
+      const after = await snapshot(root);
+      expect(after.status).toBe('?? untracked-input.txt');
+      expect(after.status).toBe(before.status);
+      expect(after.index).toBe(before.index);
+      expect(after.untracked).not.toEqual(before.untracked);
+      expect(after.untracked['untracked-input.txt']).toBe('7b9a72466d3960eb2aacccfc848939453490db0678bd4725def3f789b891c919');
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  test('failed reclamation retains worker ownership so final teardown retries it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'neat-cleanup-test-'));
+    await writeFile(join(root, 'owned.txt'), 'retain until reclaimed');
+    const proc = spawn(process.execPath, ['--no-env-file', '--eval', 'setInterval(()=>{},1000)'], { stdio: 'ignore', env: gitEnvironment() });
+    const owned = { proc, closed: new Promise<void>((resolve, reject) => { proc.once('close', () => resolve()); proc.once('error', reject); }) };
+    const owner: { current: typeof owned | undefined } = { current: owned };
+    const outcomes: string[] = [];
+    try {
+      await expect(stopOwnedWorker(owner, { reclaim: async () => { outcomes.push('refused'); throw new Error('Ownership check failed'); }, verify: async () => {} })).rejects.toThrow('Ownership check failed');
+      expect(owner.current).toBe(owned);
+      await expect(removeOwnedRoot(root, owner)).rejects.toThrow('worker reclamation remains unverified');
+      expect(await readFile(join(root, 'owned.txt'), 'utf8')).toBe('retain until reclaimed');
+      await stopOwnedWorker(owner, { reclaim: async () => { outcomes.push('reclaimed'); }, verify: async () => { outcomes.push('verified'); } });
+      expect(outcomes).toEqual(['refused', 'reclaimed', 'verified']);
+      expect(owner.current).toBeUndefined();
+      await removeOwnedRoot(root, owner);
+      expect(await readFile(join(root, 'owned.txt'), 'utf8').catch(error => error.code)).toBe('ENOENT');
+    } finally { proc.kill('SIGKILL'); await owned.closed; await rm(root, { recursive: true, force: true }); }
+  });
+});

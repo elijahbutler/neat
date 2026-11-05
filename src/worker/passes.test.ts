@@ -1,6 +1,6 @@
 import { $ } from 'bun';
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { mkdir, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sha256 } from './passes';
 import type { History } from './history';
@@ -132,6 +132,14 @@ test('an edit is refused when the file changed behind the editor, and Keep and U
   expect(undo.status).toBe(409);
   expect(await readFile(file, 'utf8')).toBe(applied + '// and again\n');
   expect(await readdir(join(t.home, 'passes')).catch(() => [])).toEqual([]);
+  // A refused undo discarded its cached project. Restoring the exact pending bytes makes retry safe.
+  await writeFile(file, applied);
+  const retried = await r.undo();
+  expect(retried.status).toBe(200);
+  expect(retried.body.pending).toBeNull();
+  expect(await readFile(file, 'utf8')).toBe(PAGE);
+  expect((await r.edit(h1, setText(h1, 'Recovered'))).body.ok).toBe(true);
+  expect(await readFile(file, 'utf8')).toContain('Recovered</h1>');
   await r.close();
 }, 60_000);
 
@@ -194,24 +202,34 @@ test('an earlier undo preserves selected tags in files it does not change', asyn
   await r.close();
 }, 90_000);
 
-test('an earlier undo commits its validated snapshot even if a watcher rewrites the file during staging', async () => {
-  const { watch, writeFileSync } = await import('node:fs');
+test('an earlier undo commits its validated snapshot despite an external rewrite immediately before staging', async () => {
   const r = await run();
   await r.edit(h1, setText(h1, 'Welcome')); await r.keep();
   await r.edit(list, [{ op: 'replace-class', target: list, from: 'gap-2', to: 'gap-4' }]); await r.keep();
   const steps = (await r.call(r.prefix)).body.timeline!;
   const expected = PAGE.replace('gap-2', 'gap-4');
   const file = join(r.dir, 'app/page.tsx');
-  let rewritten = false;
-  const watcher = watch(join(r.dir, 'app'), (event, filename) => {
-    if (event === 'rename' && filename === 'page.tsx' && !rewritten) {
-      rewritten = true;
-      writeFileSync(file, expected + '// external rewrite\n');
-    }
-  });
+  const realGit = Bun.which('git');
+  if (!realGit) throw new Error('Git is required for the undo regression');
+  const bin = join(t.temp, 'git-interceptor');
+  const marker = join(bin, 'rewritten');
+  await mkdir(bin);
+  const shim = join(bin, 'git');
+  await writeFile(shim, `#!${process.execPath}
+const args = process.argv.slice(2);
+if (process.cwd() === ${JSON.stringify(r.dir)} && args.includes('add') && args.includes('app/page.tsx') && !await Bun.file(${JSON.stringify(marker)}).exists()) {
+  await Bun.write(${JSON.stringify(file)}, ${JSON.stringify(expected + '// external rewrite\n')});
+  await Bun.write(${JSON.stringify(marker)}, 'rewritten');
+}
+const child = Bun.spawn([${JSON.stringify(realGit)}, ...args], { stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' });
+process.exit(await child.exited);
+`);
+  await chmod(shim, 0o700);
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${bin}:${previousPath ?? ''}`;
   try { expect((await r.undo({ step: steps[0]!.id })).status).toBe(200); }
-  finally { watcher.close(); }
-  expect(rewritten).toBe(true);
+  finally { if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath; }
+  expect(await readFile(marker, 'utf8')).toBe('rewritten');
   expect(await $`git show HEAD:app/page.tsx`.cwd(r.dir).quiet().text()).toBe(expected);
   expect(await readFile(file, 'utf8')).toBe(expected + '// external rewrite\n');
   const saved = await savedPass();

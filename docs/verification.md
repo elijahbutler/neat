@@ -80,3 +80,15 @@ Export tests exercise both the Linux directory-descriptor path and the portable 
 No production build ran. Docker integration tests were skipped. The real Open pull request button was not used, and no acceptance branch was pushed. Live model services, native macOS, Windows, and concurrent workers remain unverified.
 
 The blog starter's Tailwind v3 color configuration and the monorepo's workspace stylesheet tokens do not fully populate property controls. The documentation app in `shadcn-ui/ui` also needs generated registry assets before startup. These limits are recorded in the [roadmap](../ROADMAP.md); this work did not implement the M3 token system.
+
+## Repeatable browser acceptance
+
+The repository now retains `scripts/verify-editor.mjs` and a maintained verification skill and feature map. Two consecutive isolated Chromium runs passed all 13 reported coverage phases. They exercised native selection and text editing, visible stylesheet overrides, consecutive property edits, pending and latest kept Undo, delayed inspection, full iframe reloads in both response orders, scripted Ask, shared confirmation and cancellation, route navigation, browser reload, worker restart, branch creation, patch download, mobile delivery layout, and keyboard navigation.
+
+The delayed-inspection case also reloaded the iframe before releasing the inspection response, then verified the outline and another edit. A separate API regression restored the exact pending bytes after an external-file refusal and successfully retried Undo. The staging-race regression uses a temporary Git executable to rewrite the file immediately before staging, removing dependence on filesystem event timing.
+
+The runner applied each downloaded patch in another worktree and required exact tree equality with the delivered branch. Before and after teardown it compared input HEAD, active branch, index hash, staged and unstaged diffs, and untracked file hashes. Cleanup removed only owned processes and temporary worktrees. Reports, source provenance, traces, screenshots, passes, patches, and branch bundles remained outside the repository.
+
+The model adapter used a local scripted HTTP provider with fake credentials. No live model service or publication action ran. Console records include the expected shared-confirmation refusal responses and connection failures during the intentional worker restart. Neither passing run recorded uncaught browser exceptions. Full iframe reload ordering was exercised; separately controlling hot-update response ordering remains supplemental.
+
+See [browser acceptance](local-development.md#browser-acceptance) for the command and [the feature map](../.agents/skills/verify-neat/features/README.md) for remaining entry points and gaps.

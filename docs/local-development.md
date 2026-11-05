@@ -24,3 +24,20 @@ Run `bun run typecheck` and focused `bun test path/to/file.test.ts` checks while
 `bun run editor` opens orbit-studio through the same worker. `bun bin/neat.ts extract fixtures/orbit-studio` inspects extracted data without starting a server. The optional public catalogue uses `NEAT_LIBRARY_URL`; otherwise the library panel lists local components and reports the external catalogue as unavailable.
 
 See [verification](verification.md) for the acceptance scope, [product intent](../PRODUCT.md), [design](../DESIGN.md), and the [roadmap](../ROADMAP.md).
+
+## Browser acceptance
+
+Use `scripts/verify-editor.mjs` to drive an isolated editor through Chromium. Supply an existing Playwright module and browser installed outside this checkout. The runner adds no project dependencies and never attaches to an existing editor session.
+
+```sh
+NEAT_BROWSER_DRIVER=/path/to/playwright/index.mjs bun scripts/verify-editor.mjs \
+  --port 4460 --provider-port 4462 \
+  --browser-executable /path/to/chromium \
+  --evidence /tmp/neat-browser-proof
+```
+
+Choose a new evidence directory for each run. Run `bun scripts/verify-editor.mjs --help` for the options. The preview uses the normal port allocator. The runner creates its own fixture repository, saved-pass directory, and local scripted model endpoint with fake credentials. It does not use a live model service or publish a pull request.
+
+Read `report.json` for asserted coverage and remaining gaps. The trace, screenshots, source revision and diff, pass files, exported patch, and branch bundle remain in the evidence directory after cleanup. A successful run must also report completed cleanup and unchanged input files and index. A failed run exits nonzero and retains its evidence.
+
+The maintained [verification skill](../.agents/skills/verify-neat/SKILL.md) and [feature map](../.agents/skills/verify-neat/features/README.md) describe manual entry points and supplemental checks. Treat their proof status as specific to the entries actually exercised.

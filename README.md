@@ -86,7 +86,7 @@ bun bin/neat.ts edit ./your-app ops.json
 
 ## Contributing
 
-Use Bun. Run `bun run fixtures:install`, then `bun run check`. Prefer focused tests while editing. See [local development](docs/local-development.md) and [library guidance](docs/resources/libraries.md). The worker is in `src/worker`, the editor client in `src/app/editor`, and sandbox providers in `src/sandbox`. Extraction and source tagging live in `src/extract` and `src/tagging`.
+Use Bun. Run `bun run fixtures:install`, then `bun run check`. Prefer focused tests while editing. Use the isolated [browser acceptance runner](docs/local-development.md#browser-acceptance) for user-workflow checks. See [local development](docs/local-development.md) and [library guidance](docs/resources/libraries.md). The worker is in `src/worker`, the editor client in `src/app/editor`, and sandbox providers in `src/sandbox`. Extraction and source tagging live in `src/extract` and `src/tagging`.
 
 ## License
 
