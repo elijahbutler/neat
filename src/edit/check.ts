@@ -1,4 +1,6 @@
 import { Node, SyntaxKind, ts, type Diagnostic, type Project, type SourceFile } from 'ts-morph';
+import { isAbsolute, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { projectPath } from '../extract/project';
 import type { ComponentInfo } from '../extract/types';
 import { resolveComponentTag } from '../extract/usage';
@@ -21,6 +23,39 @@ export interface CheckResult {
 
 type Finding = Omit<CheckError, 'check' | 'file'> & { key: string };
 
+function moduleLabel(root: string, specifier: string): string {
+  let file = specifier;
+  if (file.startsWith('file://')) {
+    try { file = fileURLToPath(file); } catch { return '[external module]'; }
+  }
+  file = file.replaceAll('\\', '/');
+  if (!isAbsolute(file) && !/^[a-zA-Z]:\//.test(file)) return specifier;
+  const local = relative(resolve(root), file);
+  if (local && !isAbsolute(local) && local !== '..' && !local.startsWith('../')) return local.replaceAll('\\', '/');
+  const dependency = file.lastIndexOf('/node_modules/');
+  return dependency >= 0 ? file.slice(dependency + 1) : '[external module]';
+}
+
+/** Remove machine locations before check feedback reaches a model or an API caller. */
+function safeMessage(root: string, message: string): string {
+  const rewrite = (value: string): string => {
+    let decoded: string;
+    try {
+      const parsed: unknown = value[0] === '"' ? JSON.parse(value) : value.slice(1, -1).replace(/\\(['\\])/g, '$1');
+      if (typeof parsed !== 'string') return value;
+      decoded = parsed;
+    }
+    catch { return value; }
+    const label = moduleLabel(root, decoded);
+    if (label === decoded) return value;
+    return value[0] === '"' ? JSON.stringify(label) : `'${label.replaceAll("'", "\\'")}'`;
+  };
+  const imports = message.replace(/import\(("(?:\\.|[^"\\])*")\)/g, (_match, specifier: string) => `import(${rewrite(specifier)})`);
+  const quoted = imports.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, rewrite);
+  const location = resolve(root).replaceAll('\\', '/');
+  return quoted.replaceAll(location + '/', '').replaceAll(location, '[project]');
+}
+
 function diagnostics(list: Diagnostic[]): Finding[] {
   return list.map((d) => {
     const message = `TS${d.getCode()}: ${ts.flattenDiagnosticMessageText(d.compilerObject.messageText, ' ')}`;
@@ -34,7 +69,7 @@ function externalImports(root: string, sf: SourceFile): Finding[] {
     const target = imp.getModuleSpecifierSourceFile();
     if (target && projectPath(root, target.getFilePath())) return [];
     const spec = imp.getModuleSpecifierValue();
-    return [{ key: spec, line: imp.getStartLineNumber(), message: `imports ${spec}, which this file didn't import before` }];
+    return [{ key: spec, line: imp.getStartLineNumber(), message: `imports ${moduleLabel(root, spec)}, which this file didn't import before` }];
   });
 }
 
@@ -135,13 +170,13 @@ export function checkEdit(project: Project, root: string, index: RepoIndex, chan
       const after = collect(sf);
       for (const check of ['syntax', 'typecheck', 'imports', 'variants'] as const) {
         const found = introduced(before[i]![check], after[check]);
-        for (const f of found) errors.push({ check, file: change.file, line: f.line, message: f.message });
+        for (const f of found) errors.push({ check, file: change.file, line: f.line, message: safeMessage(root, f.message) });
         // A new syntax error makes every later check noise.
         if (check === 'syntax' && found.length) break;
       }
     });
     consumers.forEach(({ file, sf }, i) => {
-      for (const f of introduced(beforeConsumers[i]!, semantic(sf))) errors.push({ check: 'typecheck', file, line: f.line, message: f.message });
+      for (const f of introduced(beforeConsumers[i]!, semantic(sf))) errors.push({ check: 'typecheck', file, line: f.line, message: safeMessage(root, f.message) });
     });
   } finally {
     for (const { change, sf } of files) sf.replaceWithText(change.before);

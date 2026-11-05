@@ -4,7 +4,7 @@ import type { CheckStatus } from '../edit/direct';
 import type { FileChange } from '../edit/operations';
 import type { FileSpan } from '../edit/shift';
 import {
-  commitFiles, dropHeadCommit, headCommit, headText, previewPatch, readApp, Refusal, repoPath, requireState, snapshotPatch, stage, stagedPatch, unstage, writeApp,
+  commitFiles, dropHeadCommit, headCommit, headText, previewPatch, readApp, Refusal, repoPath, requireState, snapshotPatch, stage, unstage, writeApp,
   type Worktree,
 } from './git';
 import { isReplayable, newId, now, sha256, type EditEntry, type Entry, type Pass, type StepFile } from './passes';
@@ -111,20 +111,20 @@ export async function undoStep(h: History, id: string, hooks: UndoHooks): Promis
     if (newest) {
       entry.undone = { mode: 'dropped', at: now() };
       h.pass.updatedAt = now();
-      try { await h.persist(); } catch (error) { delete entry.undone; h.pass.updatedAt = before; throw error; }
+      try { await h.persist(); } catch (error) { delete entry.undone; h.pass.updatedAt = before; await h.persist().catch(() => undefined); throw error; }
       try { await dropHeadCommit(h.wt, names); } catch (error) { delete entry.undone; h.pass.updatedAt = before; await h.persist().catch(() => undefined); throw error; }
       h.commits.delete(entry.id);
       return { entry, mode: 'dropped', changes };
     }
     const revert: Entry = {
       kind: 'revert', target: entry.id, id: newId('step'), summary: `Undo: ${entry.summary}`.slice(0, 200), createdAt: now(),
-      files: stepFiles(h, changes), patch: await stagedPatch(h.wt, names), checks: entry.checks, spans: [],
+      files: stepFiles(h, changes), patch: await snapshotPatch(h.wt, changes), checks: entry.checks, spans: [],
     };
     entry.undone = { mode: 'reverted', at: now(), revertId: revert.id };
     h.pass.entries.push(revert);
     h.pass.updatedAt = now();
     const undo = () => { delete entry.undone; h.pass.entries = h.pass.entries.filter((e) => e !== revert); h.pass.updatedAt = before; };
-    try { await h.persist(); } catch (error) { undo(); throw error; }
+    try { await h.persist(); } catch (error) { undo(); await h.persist().catch(() => undefined); throw error; }
     try { h.commits.set(revert.id, await commitFiles(h.wt, revert.summary, names, revert.patch)); }
     catch (error) { undo(); await h.persist().catch(() => undefined); throw error; }
     return { entry, mode: 'reverted', changes };
