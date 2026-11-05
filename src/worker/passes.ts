@@ -119,7 +119,11 @@ export async function writePass(pass: Pass): Promise<void> {
     throw error;
   }
   await handle.close();
-  try { await rename(temp, target); } catch (error) { await rm(temp, { force: true }); throw error; }
+  try {
+    await rename(temp, target);
+    const directory = await open(dir, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    try { await directory.sync(); } finally { await directory.close(); }
+  } catch (error) { await rm(temp, { force: true }); throw error; }
 }
 
 export interface LoadedPasses {

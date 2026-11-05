@@ -60,6 +60,40 @@ test('a consumer that already had an error is not blamed for it', async () => {
   expect(checkEdit(project, temp, index, [harmless]).ok).toBe(true);
 });
 
+test('diagnostics name project modules without exposing absolute paths', async () => {
+  const page = `import { A } from '../components/A';
+import { Props } from '../components/B';
+const data: Props = { b: 'ok' };
+export default function Page() { return <A arg={{ a: 'ok' }} />; }
+`;
+  const { project, index } = await load({
+    'components/A.tsx': "export interface Props { a: string } export function A({ arg }: { arg: Props }) { return <span>{arg.a}</span>; }",
+    'components/B.ts': 'export interface Props { b: string }',
+    'app/page.tsx': page,
+  });
+  const result = checkEdit(project, temp, index, [{ file: 'app/page.tsx', before: page, after: page.replace("arg={{ a: 'ok' }}", 'arg={data}') }]);
+  expect(result.ok).toBe(false);
+  const message = result.errors.map(e => e.message).join('\n');
+  expect(message).toContain('components/A');
+  expect(message).toContain('components/B');
+  expect(message).not.toContain(temp);
+  expect(message).not.toMatch(/import\("\//);
+  expect(project.getSourceFileOrThrow(join(temp, 'app/page.tsx')).getFullText()).toBe(page);
+  const nested = checkEdit(project, join(temp, 'app'), index, [{ file: 'page.tsx', before: page, after: page.replace("arg={{ a: 'ok' }}", 'arg={data}') }]);
+  expect(nested.ok).toBe(false);
+  expect(JSON.stringify(nested.errors)).not.toContain(temp);
+  expect(nested.errors.map(e => e.message).join('\n')).toContain('[external module]');
+});
+
+test('new absolute imports are refused without reflecting their machine location', async () => {
+  const page = 'export default function Page() { return <main />; }';
+  const { project, index } = await load({ 'app/page.tsx': page });
+  const result = checkEdit(project, temp, index, [{ file: 'app/page.tsx', before: page, after: 'import { value } from "/external-machine/module";\n' + page }]);
+  expect(result.ok).toBe(false);
+  expect(JSON.stringify(result.errors)).not.toContain('/external-machine/');
+  expect(result.errors.find(e => e.check === 'imports')?.message).toBe("imports [external module], which this file didn't import before");
+});
+
 test('a selection inside a shared definition needs confirmation; a single-use definition does not', async () => {
   const { project, index } = await load({ 'components/Badge.tsx': BADGE, 'app/page.tsx': CONSUMER, 'app/other/page.tsx': OTHER, 'components/Solo.tsx': 'export function Solo() { return <em className="italic">x</em>; }\n' });
   const span = 'components/Badge.tsx:3:10';

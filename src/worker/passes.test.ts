@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdir, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sha256 } from './passes';
+import type { History } from './history';
 import { commitAll, head, LAYOUT, makeRepo, openSession, PAGE, read, startWorker, tagOf, worktreeProvider, type TestRepo } from './test-support';
 
 const savedHome = process.env.NEAT_HOME;
@@ -175,6 +176,71 @@ test('Undo on an earlier step keeps the work after it, records a revert, and sur
   const again = await run();
   expect(again.session.recovery).toEqual({ restored: 3, skipped: 0, failure: null });
   expect(again.session.timeline.map((s: { status: string }) => s.status)).toEqual(['undone', 'kept']);
+  expect(await read(again.dir, 'app/page.tsx')).toBe(page);
+  await again.close();
+}, 90_000);
+
+test('an earlier undo commits its validated snapshot even if a watcher rewrites the file during staging', async () => {
+  const { watch, writeFileSync } = await import('node:fs');
+  const r = await run();
+  await r.edit(h1, setText(h1, 'Welcome')); await r.keep();
+  await r.edit(list, [{ op: 'replace-class', target: list, from: 'gap-2', to: 'gap-4' }]); await r.keep();
+  const steps = (await r.call(r.prefix)).body.timeline!;
+  const expected = PAGE.replace('gap-2', 'gap-4');
+  const file = join(r.dir, 'app/page.tsx');
+  let rewritten = false;
+  const watcher = watch(join(r.dir, 'app'), (event, filename) => {
+    if (event === 'rename' && filename === 'page.tsx' && !rewritten) {
+      rewritten = true;
+      writeFileSync(file, expected + '// external rewrite\n');
+    }
+  });
+  try { expect((await r.undo({ step: steps[0]!.id })).status).toBe(200); }
+  finally { watcher.close(); }
+  expect(rewritten).toBe(true);
+  expect(await $`git show HEAD:app/page.tsx`.cwd(r.dir).quiet().text()).toBe(expected);
+  expect(await readFile(file, 'utf8')).toBe(expected + '// external rewrite\n');
+  const saved = await savedPass();
+  const pass = await saved.read(saved.files[0]!);
+  expect(pass.entries.at(-1).files[0].afterHash).toBe(sha256(expected));
+  expect(pass.entries.at(-1).patch).not.toContain('external rewrite');
+  await r.close();
+  const again = await run();
+  expect(again.session.recovery).toEqual({ restored: 3, skipped: 0, failure: null });
+  expect(await read(again.dir, 'app/page.tsx')).toBe(expected);
+  await again.close();
+}, 90_000);
+
+for (const which of ['newest', 'earlier'] as const) test(`a failed ${which} undo save restores history that was already renamed into place`, async () => {
+  const { openWorktree } = await import('./git');
+  const { undoStep } = await import('./history');
+  const { passSchema, writePass } = await import('./passes');
+  const r = await run();
+  await r.edit(h1, setText(h1, 'Welcome')); await r.keep();
+  await r.edit(list, [{ op: 'replace-class', target: list, from: 'gap-2', to: 'gap-4' }]); await r.keep();
+  const page = await read(r.dir, 'app/page.tsx');
+  const saved = await savedPass();
+  const original = await saved.read(saved.files[0]!);
+  const pass = passSchema.parse(original);
+  const commits = (await $`git rev-list --reverse ${pass.baseCommit}..HEAD`.cwd(r.dir).quiet().text()).trim().split('\n');
+  let fail = true;
+  const history: History = {
+    wt: await openWorktree(r.dir), pass,
+    commits: new Map(pass.entries.map((entry, index) => [entry.id, commits[index]!])),
+    persist: async () => {
+      await writePass(pass);
+      if (fail) { fail = false; throw new Error('Directory sync failed after rename'); }
+    },
+  };
+  const entry = pass.entries[which === 'newest' ? 1 : 0]!;
+  await expect(undoStep(history, entry.id, { check: () => null })).rejects.toThrow('Directory sync failed after rename');
+  expect(await saved.read(saved.files[0]!)).toEqual(original);
+  expect(await read(r.dir, 'app/page.tsx')).toBe(page);
+  expect((await $`git rev-parse HEAD`.cwd(r.dir).quiet().text()).trim()).toBe(commits[1]!);
+  await r.close();
+  const again = await run();
+  expect(again.session.recovery).toEqual({ restored: 2, skipped: 0, failure: null });
+  expect(again.session.timeline.map(step => step.status)).toEqual(['kept', 'kept']);
   expect(await read(again.dir, 'app/page.tsx')).toBe(page);
   await again.close();
 }, 90_000);
