@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { NextConfig } from 'next';
+import { withEditorFraming } from './framing';
 
 type Rules = NonNullable<NonNullable<NextConfig['turbopack']>['rules']>;
 type RuleCollection = Rules[string];
@@ -9,6 +10,7 @@ type RuleCollection = Rules[string];
 export interface TaggingOptions {
   loaderPath: string;
   root: string;
+  editorOrigin?: string;
 }
 
 export interface ConfigContext {
@@ -73,6 +75,7 @@ export function addTagging(config: NextConfig, { loaderPath, root }: TaggingOpti
 export function withNeatTagging(input: NextConfigInput, opts: TaggingOptions) {
   return async (phase: string, ctx: ConfigContext): Promise<NextConfig> => {
     const config = typeof input === 'function' ? await input(phase, ctx) : input;
-    return addTagging(config, opts);
+    const preview = phase === 'phase-development-server' && opts.editorOrigin !== undefined ? withEditorFraming(config, opts.editorOrigin) : config;
+    return addTagging(preview, opts);
   };
 }

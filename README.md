@@ -23,6 +23,8 @@ Open the printed editor URL to follow startup while Neat prepares the preview. T
 
 The preview starts from a committed revision in a detached Git worktree. Your original files, index, and current branch stay unchanged, including uncommitted work. Commit changes you want included in a new preview first. Only open repositories you trust: their Next.js configuration and development code run on your machine.
 
+The generated sandbox config allows its exact editor origin through `frame-ancestors` during development. It preserves other configured CSP directives and response header values. Delivery excludes this preview configuration.
+
 ## Make and keep changes
 
 Use the inspector's **Edit**, **History**, and **Deliver** tabs for properties and Ask, saved steps, and local delivery. Move between tabs with the arrow keys. Home selects **Edit**, and End selects **Deliver**.
@@ -66,6 +68,8 @@ Created branches and patch files remain after stopping the editor. The delivery 
 ## Current limits
 
 Editing focuses on source files owned by the selected app. Workspace dependency resolution supports pnpm and hoisted Next installations, but selecting and editing component definitions outside the app directory remains limited. MDX content, runtime-generated markup, and dynamic text may not map to an editable source element.
+
+The preview adapts frame policies from Next.js configuration. Policies produced by middleware or route handlers can still prevent embedding.
 
 Tailwind v3 configuration, semantic color roles, dark-surface matching, and tokens from workspace stylesheets need more work. Text and supported spacing controls still work when token lists are incomplete. Inspect the preview before keeping a style change.
 

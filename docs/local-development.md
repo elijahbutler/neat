@@ -33,6 +33,8 @@ See [verification](verification.md) for the acceptance scope, [product intent](.
 
 Use `scripts/verify-editor.mjs` to drive an isolated editor through Chromium. Supply an existing Playwright module and browser installed outside this checkout. The runner adds no project dependencies and never attaches to an existing editor session.
 
+The runner requires stable Bun 1.3.13 or newer so its worker cannot load model credentials from a checkout dotenv file. Older and prerelease runtimes are refused before startup.
+
 ```sh
 NEAT_BROWSER_DRIVER=/path/to/playwright/index.mjs bun scripts/verify-editor.mjs \
   --port 4460 --provider-port 4462 \

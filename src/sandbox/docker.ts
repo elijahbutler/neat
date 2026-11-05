@@ -77,7 +77,7 @@ export async function prepare(repo: string, dir: string, editorOrigin: string): 
   await $`git init -q -b session && git add -A && git -c user.name=Neat -c user.email=sandbox@neatlabs.design commit -q -m base`.cwd(dir).quiet();
 
   // Same path inside and out, so the absolute paths the tagging config was written with resolve in the container.
-  const tagged = await prepareTaggedProject(dir, bridgeSource(editorOrigin), version);
+  const tagged = await prepareTaggedProject(dir, bridgeSource(editorOrigin), version, editorOrigin);
   const excluded = ['/node_modules/', '/.next/', ...tagged.injectedPaths.map((file) => '/' + file)];
   const excludePath = (await $`git rev-parse --path-format=absolute --git-path info/exclude`.cwd(dir).quiet().text()).trim();
   await writeFile(excludePath, excluded.join('\n') + '\n');

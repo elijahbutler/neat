@@ -2,7 +2,43 @@
 
 The default worktree provider completed the edit, keep, restart, and branch workflow in Chromium on Linux. The original checkout's HEAD, status, and index hash stayed unchanged in every acceptance run. Each exported patch also applied with `git am -3` in an independent worktree and produced the same tree as the delivered branch.
 
-## Repositories and setup
+## Current workspace acceptance
+
+The workspace at `11954223e58088d93ed58e0b5ce362d0ec4ff045`, or its recorded working diff before commit, completed fresh Chromium runs on all three fixtures and two public repositories. A third public repository exercised the subsequent CommonJS and preview-framing fixes. Each report records source HEAD and a SHA-256 of the working diff.
+
+| Target | Revision and runtime | Observed result |
+| --- | --- | --- |
+| Orbit Studio, Acme Analytics, and Messy Market | Bundled fixtures, Next 16.3.5 | Each passed all ten workflow checks and cleanup |
+| `vercel/next.js`, `examples/blog-starter` | `409e64fc0687aada39dbab193d37452792246785`, Next 16.4.5 | All ten checks and cleanup passed; Avatar confirmation covered two routes |
+| `shadcn-ui/ui`, `templates/next-monorepo`, app `apps/web` | Upstream `8a3536678a528cc012b9e62484290e79d0be410f`; prepared `2f39aed915562a34c4d772454e3355a600ff7b72`; Next 16.4.3 | Nine checks and cleanup passed; sibling-package shared editing was skipped |
+| `timlrx/tailwind-nextjs-starter-blog` | `b45bef66b40c63b6f57c15ee8cd090682238df4c`, Next 15.5.12 | Ten workflow checks and framing isolation passed; the strict browser-error gate failed on two reproduced upstream hydration errors |
+
+These runs used Bun 1.4.4 and Chromium 156.0.8078.4. The commands below ran with separate saved-pass directories and a local scripted provider. Paths are placeholders for the owned scratch clones:
+
+```sh
+bun --no-env-file bin/neat.ts open /path/to/orbit-studio-copy --port 4480
+bun --no-env-file bin/neat.ts open /path/to/acme-analytics-copy --port 4480
+bun --no-env-file bin/neat.ts open /path/to/messy-market-copy --port 4480
+bun --no-env-file bin/neat.ts open /path/to/nextjs/examples/blog-starter --port 4480
+bun --no-env-file bin/neat.ts open /path/to/ui/templates/next-monorepo --app apps/web --port 4480
+bun --no-env-file bin/neat.ts open /path/to/tailwind-nextjs-starter-blog --port 4480
+```
+
+The blog starter used `bun install` in its app directory. The monorepo used `bunx pnpm@11.25.0 install`, the normal Button generator, and the runtime dependency additions shown in the earlier setup below, with pnpm 11.25.0. Its template stylesheet supplies no finished color theme. The third repository used Bun install and Contentlayer generation before opening. Contentlayer also regenerated its thirteen documents during normal preview startup. No production build ran.
+
+All workflow checks used native selection, inline text edits, visible consecutive padding changes, scripted Ask, pending and latest kept Undo, timeline diffs, browser reload, worker restart, and local branch and patch delivery. Shared confirmation passed on every fixture, the blog starter, and SectionContainer in the third repository. SectionContainer's impact listed nine routes and five call sites. Cancel wrote nothing, and confirmation required no additional provider call. The monorepo's Button lives outside the selected app and remains outside that verified scope.
+
+Every completed workflow produced equal branch and independently applied patch trees. Input HEAD, branch, index, staged and unstaged changes, and untracked bytes matched after cleanup. Preview configuration changes stayed out of delivery.
+
+The additional starter first reproduced a CommonJS configuration import failure, then Chromium's rejection of its original `X-Frame-Options: DENY`. After the bounded fixes, the editor connected while an unrelated parent origin received a CSP framing refusal. The response retained `X-Frame-Options` and every original non-ancestor CSP directive. Its two Headless UI portal hydration errors also reproduced in an uninstrumented worktree with the same dependencies and byte-identical upstream configuration. The strict acceptance report remains failed; its eleven successful checks are recorded separately.
+
+Early runtime records contained Bun's Node-compatibility value. Their correction records distinguish it from a post-run Node 24.22.2 probe. The retained runner now records the actual PATH-selected Node version and executable before CLI launch, separately from Bun's compatibility version.
+
+The final retained runner also passed all fourteen phases with PATH-selected Node 22.12.0, including the preview-framing configuration and corrected runtime metadata. Its report recorded no uncaught browser exception, completed cleanup, and unchanged input snapshots. Real-bundle config-loading tests passed on Node 22.12.0 for CommonJS, native TypeScript, and Next's TypeScript compiler.
+
+Typecheck and the subsequent `bun --smol test --timeout 30000` run passed with 473 tests, 11 Docker skips, and no failures. Regression coverage includes real Node module interop, preserved CSP directives and header precedence, development-only framing, invalid editor origins, and runtime-probe environment isolation.
+
+## Earlier repositories and setup
 
 | Target | Revision and preparation | Launch command |
 | --- | --- | --- |

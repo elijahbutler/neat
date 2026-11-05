@@ -6,6 +6,7 @@ export const repository = fileURLToPath(new URL('../../', import.meta.url));
 export const help = `Usage: NEAT_BROWSER_DRIVER=/absolute/path/to/playwright/index.mjs bun scripts/verify-editor.mjs [options]
 
 Creates a disposable Next.js fixture and isolated NEAT_HOME, then drives the real CLI.
+Requires stable Bun 1.3.13 or newer for dotenv isolation.
 Install fixture dependencies first with bun run fixtures:install. Installs nothing.
 
   --port 4460                 Editor port, at least 4460

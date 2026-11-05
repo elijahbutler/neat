@@ -11,12 +11,12 @@ import { help, isInside, parseOptions, repository } from './verification/options
 import { checkoutDiff, git, prepareFixture, snapshot } from './verification/fixture.mjs';
 import { startScriptedProvider } from './verification/provider.mjs';
 import { exerciseEditor, exerciseWorkspaceRecovery, poll } from './verification/browser.mjs';
-import { cliArguments, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
+import { cliArguments, cliEnvironment, requireIsolatedBun, runtimeMetadata, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
 
 if (process.argv.includes('--help')) {
   process.stdout.write(help);
 } else {
-  try { await main(parseOptions(process.argv.slice(2))); }
+  try { requireIsolatedBun(); await main(parseOptions(process.argv.slice(2))); }
   catch (error) { console.error(error.stack ?? error.message); process.exitCode = 1; }
 }
 
@@ -46,6 +46,7 @@ async function main(options) {
   const root = await mkdtemp(join(tmpdir(), 'neat-browser-run-'));
   const home = join(root, 'state');
   await mkdir(home);
+  const env = cliEnvironment({ home, root, providerPort: options.providerPort });
   let repo, before, provider, browser, context, page;
   const owner = { current: undefined };
   let workerOutput = '';
@@ -82,15 +83,6 @@ async function main(options) {
   };
   const launch = async () => {
     abort.signal.throwIfAborted();
-    // Start from a small allowlist. Real model credentials, model proxy URLs,
-    // catalogues, Git configuration, and preload options never reach the CLI.
-    const env = {};
-    for (const key of ['PATH', 'HOME', 'TMPDIR', 'USER', 'LANG', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH']) if (process.env[key]) env[key] = process.env[key];
-    Object.assign(env, {
-      NEAT_HOME: home, OPENAI_API_KEY: 'acceptance-fake-key', OPENAI_BASE_URL: `http://127.0.0.1:${options.providerPort}/v1`,
-      LLM_EDIT_MODEL: 'acceptance-script', NEXT_TELEMETRY_DISABLED: '1', NO_COLOR: '1',
-      GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GH_CONFIG_DIR: join(root, 'unsigned-github'),
-    });
     workerOutput = '';
     const args = cliArguments(repo, options.port);
     const proc = spawn(process.execPath, args, { cwd: repository, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -141,7 +133,7 @@ async function main(options) {
   };
   try {
     console.log(`Evidence: ${evidence}`);
-    report.source = { head: await git(repository, 'rev-parse', 'HEAD'), status: await git(repository, 'status', '--porcelain=v1'), runtime: { bun: process.versions.bun, node: process.versions.node }, runnerArguments: process.argv.slice(2), runnerPid: process.pid };
+    report.source = { head: await git(repository, 'rev-parse', 'HEAD'), status: await git(repository, 'status', '--porcelain=v1'), runtime: await runtimeMetadata(env), runnerArguments: process.argv.slice(2), runnerPid: process.pid };
     const diff = await checkoutDiff();
     await writeFile(join(evidence, 'checkout.diff'), diff, { mode: 0o600 });
     report.source.diffSha256 = createHash('sha256').update(diff).digest('hex');
