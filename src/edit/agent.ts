@@ -4,9 +4,9 @@ import type { Project } from 'ts-morph';
 import { z } from 'zod';
 import type { CatalogueReference } from '../catalogue/client';
 import { checkEdit } from './check';
-import { checkStatuses, type CheckStatus } from './direct';
+import { checkStatuses, editFeedback, onlyConfirmations, replayEdit, type CheckStatus } from './direct';
 import { buildContext, resolveSelection, type RepoIndex } from './index';
-import { applyEdits, editOperationsSchema, type EditError, type FileChange } from './operations';
+import { applyEdits, editOperationsSchema, type EditOperation, type FileChange } from './operations';
 import { MODEL_SETUP_NOTE, type EditClient } from './model';
 import { confirmations, type ScopeConfirmation } from './scope';
 import type { FileSpan } from './shift';
@@ -89,11 +89,15 @@ interface EditResult {
   errors: string[];
   /** Shared components the last failed attempt wanted to change. Confirming one means asking again with it allowed. */
   confirm: ScopeConfirmation[];
+  /**
+   * The exact operations the model returned when only a shared-component confirmation stood in the way and the change
+   * passes every check once confirmed. Replay these after the confirmation instead of asking the model again.
+   */
+  operations?: EditOperation[];
   usage: EditUsage;
 }
 
-/** One line per applier error, as the model reads it. */
-export const editFeedback = (errors: EditError[]) => errors.map((e) => `operation ${e.op} (${e.code}): ${e.message}`).join('\n');
+export { editFeedback };
 
 /** Plan and apply an edit: context packet in, edit operations out, validated and checked, with bounded retries. */
 export async function proposeEdit(req: EditRequest): Promise<EditOutcome> {
@@ -141,12 +145,21 @@ export async function proposeEdit(req: EditRequest): Promise<EditOutcome> {
     messages.push({ role: 'assistant', content: response.content });
 
     let feedback: string;
-    const applied = applyEdits(req.project, req.root, req.index, z.object({ operations: editOperationsSchema }).parse(response.parsed_output).operations, { selection: req.tag, allow: req.allow });
+    const operations = z.object({ operations: editOperationsSchema }).parse(response.parsed_output).operations;
+    const applied = applyEdits(req.project, req.root, req.index, operations, { selection: req.tag, allow: req.allow });
     confirm = confirmations(applied.errors);
     if (!applied.ok) {
       feedback = editFeedback(applied.errors);
       errors.push(feedback);
-      if (confirm.length > 0) {
+      if (onlyConfirmations(applied.errors) && confirm.length > 0) {
+        // Ask the person only about a change that would otherwise go through. Otherwise the model hears what broke.
+        const preview = replayEdit(req.project, req.root, req.index, { tag: req.tag, operations, allow: [...(req.allow ?? []), ...confirm.map((c) => c.allow)] });
+        if (preview.ok) return { changes: null, spans: [], nextTag: null, checks: [], attempts: attempt, errors, confirm, operations, usage };
+        feedback = `Changing the shared component is allowed, but then it fails:\n${preview.feedback}`;
+        errors.push(feedback);
+        confirm = [];
+      } else if (confirm.length > 0) {
+        // Other operations are outside the selection too, so confirming would not be enough. The person decides next.
         return { changes: null, spans: [], nextTag: null, checks: [], attempts: attempt, errors, confirm, usage };
       }
     } else {

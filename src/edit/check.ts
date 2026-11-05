@@ -76,9 +76,26 @@ function introduced(before: Finding[], after: Finding[]): Finding[] {
 }
 
 /**
+ * Files that render a component declared in one of the changed files, from the current render graph. Their types depend
+ * on the edited component's props, so an edit is checked there too. The changed files themselves are left out.
+ */
+export function consumerFiles(index: RepoIndex, changed: string[]): string[] {
+  const edited = new Set(changed);
+  const ids = new Set(index.profile.components.filter((c) => edited.has(c.file)).map((c) => `${c.file}:${c.line}`));
+  const files = new Set<string>();
+  for (const [owner, rendered] of Object.entries(index.renders)) {
+    if (!rendered.some((id) => ids.has(id))) continue;
+    const file = owner.slice(0, owner.lastIndexOf(':'));
+    if (!edited.has(file)) files.add(file);
+  }
+  return [...files].sort();
+}
+
+/**
  * Check applied changes against the repo: they must parse, add no type errors, import nothing new from outside the
- * project, and pass only defined variant values. Problems that existed before the edit are ignored. The project is
- * restored before returning.
+ * project, and pass only defined variant values. Files that render an edited component are type-checked too, so an edit
+ * that breaks a consumer fails here. Problems that existed before the edit are ignored. The project is restored before
+ * returning.
  */
 export function checkEdit(project: Project, root: string, index: RepoIndex, changes: FileChange[]): CheckResult {
   const components = index.profile.components;
@@ -98,7 +115,14 @@ export function checkEdit(project: Project, root: string, index: RepoIndex, chan
     return { change, sf };
   });
 
+  const consumers = consumerFiles(index, changes.map((change) => change.file)).flatMap((file) => {
+    const sf = project.getSourceFiles().find((source) => projectPath(root, source.getFilePath()) === file);
+    return sf ? [{ file, sf }] : [];
+  });
+  const semantic = (sf: SourceFile) => diagnostics(project.getProgram().getSemanticDiagnostics(sf));
+
   const before = files.map(({ sf }) => collect(sf));
+  const beforeConsumers = consumers.map(({ sf }) => semantic(sf));
   const errors: CheckError[] = [];
   try {
     for (const { change, sf } of files) sf.replaceWithText(change.after);
@@ -110,6 +134,9 @@ export function checkEdit(project: Project, root: string, index: RepoIndex, chan
         // A new syntax error makes every later check noise.
         if (check === 'syntax' && found.length) break;
       }
+    });
+    consumers.forEach(({ file, sf }, i) => {
+      for (const f of introduced(beforeConsumers[i]!, semantic(sf))) errors.push({ check: 'typecheck', file, line: f.line, message: f.message });
     });
   } finally {
     for (const { change, sf } of files) sf.replaceWithText(change.before);

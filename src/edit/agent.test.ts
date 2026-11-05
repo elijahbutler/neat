@@ -48,6 +48,8 @@ test('a change to a shared component fails with what to confirm, and passes once
   expect(refused.changes).toBeNull();
   expect(refused.attempts).toBe(1);
   expect(refused.confirm.map((c) => [c.component, c.file])).toEqual([['Section', 'components/Section.tsx']]);
+  // The model's exact operations are kept so a confirmation can replay them without another call.
+  expect(refused.operations).toEqual(section);
 
   const allowed = await scripted([section]).ask('app/page.tsx:9:7', [refused.confirm[0]!.allow]);
   expect(allowed.changes?.map((c) => c.file)).toEqual(['components/Section.tsx']);

@@ -20,10 +20,10 @@ function setup(name: string) {
     options,
     style: (tag: string) => styleSource(project, root, tag),
     /** What the panel does for one control: read the classes, work out the change, send it as a direct edit. */
-    set: (tag: string, id: PropertyId, value: string | null) => {
+    set: (tag: string, id: PropertyId, value: string | null, allow?: string[]) => {
       const style = styleSource(project, root, tag)!;
       if (style.className.kind !== 'static') throw new Error(style.className.reason);
-      const result = directEdit(project, root, index, { tag, operations: classOperations(tag, changeProperty(style.className.classes, id, value, options)) });
+      const result = directEdit(project, root, index, { tag, operations: classOperations(tag, changeProperty(style.className.classes, id, value, options)), allow });
       if (!result.ok) throw new Error(result.message);
       const before = result.changes[0]!.before.split('\n');
       return result.changes[0]!.after.split('\n').filter((line, i) => line !== before[i]).map((line) => line.trim());
@@ -222,7 +222,9 @@ describe('from a control to the source', () => {
 
   test('adds a class to an existing list, and writes className when there is none', () => {
     expect(orbit.set('app/about/page.tsx:9:9', 'textColor', 'brand')).toEqual(['<h1 className="mt-4 font-display text-5xl text-brand">Four people, one studio</h1>']);
-    expect(messy.set('components/Header.tsx:8:9', 'paddingX', '4')).toEqual(['<Link href="/" className="px-4">Shop</Link>']);
+    // Header's own definition shows on every route, so a control there needs the person's confirmation first.
+    expect(() => messy.set('components/Header.tsx:8:9', 'paddingX', '4')).toThrow('Confirm it to go ahead');
+    expect(messy.set('components/Header.tsx:8:9', 'paddingX', '4', ['components/Header.tsx'])).toEqual(['<Link href="/" className="px-4">Shop</Link>']);
     expect(acme.set('app/page.tsx:21:11', 'radius', 'full')).toEqual(['<Button size="lg" className="rounded-full">Start free trial</Button>']);
   });
 
