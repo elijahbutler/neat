@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { $ } from 'bun';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, cp, mkdir, open, stat, readFile, readdir, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, cp, lstat, mkdir, open, stat, readFile, readdir, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { createServer } from 'node:net';
@@ -224,6 +224,18 @@ export function isWorkspaceRoot(root: string, packageJson: { workspaces?: unknow
   return Boolean(packageJson.workspaces) || existsSync(join(root, 'pnpm-workspace.yaml'));
 }
 
+/** An installed standalone app may have a generated, untracked lockfile. Reuse it only with identical manifests. */
+export async function copyLocalLocks(source: string, target: string): Promise<void> {
+  const locks = ['bun.lock', 'bun.lockb', 'pnpm-lock.yaml', 'yarn.lock', 'package-lock.json'];
+  if (locks.some(file => existsSync(join(target, file)))) return;
+  const manifest = await readFile(join(source, 'package.json')).catch(() => null);
+  const targetManifest = await readFile(join(target, 'package.json')).catch(() => null);
+  if (!manifest || !targetManifest || !manifest.equals(targetManifest)) return;
+  for (const file of locks) {
+    if (existsSync(join(source, file))) await sandboxWrite(target, join(target, file), await readFile(join(source, file)));
+  }
+}
+
 export async function matchingLockfiles(source: string, target: string): Promise<boolean> {
   const locks = ['bun.lock', 'bun.lockb', 'pnpm-lock.yaml', 'yarn.lock', 'package-lock.json'];
   const present = locks.filter(file => existsSync(join(source, file)) || existsSync(join(target, file)));
@@ -267,6 +279,25 @@ export async function removeWorktree(dir: string): Promise<void> {
   await $`git --git-dir=${common} worktree prune`.quiet();
 }
 
+/** Reuse package-local installs from a workspace when its lock and each package manifest match. */
+export async function reuseWorkspaceDependencies(sourceRoot: string, targetRoot: string): Promise<void> {
+  if (!await matchingLockfiles(sourceRoot, targetRoot)) return;
+  const skipped = new Set(['node_modules', '.git', '.next', '.neat', 'dist', 'out', 'coverage', '.turbo']);
+  const visit = async (source: string, target: string) => {
+    const destination = await lstat(target).catch(() => null);
+    if (!destination?.isDirectory() || destination.isSymbolicLink()) return;
+    const manifest = await readFile(join(source, 'package.json')).catch(() => null);
+    const other = await readFile(join(target, 'package.json')).catch(() => null);
+    if (manifest && other && manifest.equals(other) && existsSync(join(source, 'node_modules')) && !existsSync(join(target, 'node_modules'))) {
+      await cp(join(source, 'node_modules'), join(target, 'node_modules'), { recursive: true, verbatimSymlinks: true, mode: 2 });
+    }
+    for (const entry of await readdir(source, { withFileTypes: true })) {
+      if (entry.isDirectory() && !skipped.has(entry.name) && existsSync(join(target, entry.name))) await visit(join(source, entry.name), join(target, entry.name));
+    }
+  };
+  await visit(sourceRoot, targetRoot);
+}
+
 export function createWorktreeProvider(options: { homeDir?: string; app?: string; webpack?: boolean } = {}): SandboxProvider {
   return {
     durable: true,
@@ -286,6 +317,7 @@ export function createWorktreeProvider(options: { homeDir?: string; app?: string
         const sourceApp = resolve(repo, options.app ?? '.');
         const moduleRoots: Array<[string, string]> = [[resolve(repo), resolve(appDir, relative(sourceApp, resolve(repo)))], [sourceApp, appDir]];
         for (const [source, target] of moduleRoots) {
+          await copyLocalLocks(source, target);
           if (existsSync(join(source, 'node_modules')) && !existsSync(join(target, 'node_modules')) && await matchingLockfiles(source, target)) {
             // Reuse installed dependencies with copy-on-write where supported. Turbopack rejects symlinks
             // escaping its filesystem root, so a symlink here would require forcing webpack.
@@ -294,6 +326,8 @@ export function createWorktreeProvider(options: { homeDir?: string; app?: string
         }
         const repoDir = resolve(appDir, relative(sourceApp, resolve(repo)));
         const installRoot = existsSync(join(repoDir, 'package.json')) ? repoDir : appDir;
+        const rootPackage = JSON.parse(await readFile(join(repoDir, 'package.json'), 'utf8').catch(() => '{}'));
+        if (isWorkspaceRoot(repoDir, rootPackage)) await reuseWorkspaceDependencies(resolve(repo), repoDir);
         if (!existsSync(join(appDir, 'node_modules', '.bin', 'next')) && !existsSync(join(installRoot, 'node_modules', '.bin', 'next'))) {
           const manager = detectPackageManager(await readdir(installRoot));
           if (!manager) throw new Error('No supported lockfile found. Install dependencies in the source repo first.');

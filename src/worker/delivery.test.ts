@@ -23,8 +23,9 @@ afterEach(async () => {
 });
 
 interface GhCall { args: string[]; input?: string }
-interface Stubs { auth: CommandResult; list: CommandResult; create: CommandResult }
+interface Stubs { repo: CommandResult; auth: CommandResult; list: CommandResult; create: CommandResult }
 const READY: Stubs = {
+  repo: { code: 0, out: '{"url":"https://github.com/example/app"}' },
   auth: { code: 0, out: '' },
   list: { code: 0, out: '[]' },
   create: { code: 0, out: 'https://github.com/example/app/pull/7\n' },
@@ -36,6 +37,7 @@ function fakeGithub(stubs: Partial<Stubs> = {}) {
   const run: GithubRunner = async (args, options) => {
     calls.push({ args, input: options.input });
     if (args[0] === 'auth') return answers.auth;
+    if (args[0] === 'repo' && args[1] === 'view') return answers.repo;
     if (args[0] === 'pr' && args[1] === 'list') return answers.list;
     if (args[0] === 'pr' && args[1] === 'create') return answers.create;
     return { code: 1, out: '' };
@@ -57,9 +59,9 @@ const bodySchema = z.object({
   sessions: z.array(z.object({ delivery: deliverySchema.nullable(), timeline: timelineSchema })).optional(),
 });
 
-async function run(options: { repo?: TestRepo; github?: GithubRunner; beforeInstall?: () => Promise<void> } = {}) {
+async function run(options: { durable?: boolean; repo?: TestRepo; github?: GithubRunner; beforeInstall?: () => Promise<void> } = {}) {
   const repo = options.repo ?? t;
-  const provider = worktreeProvider(repo);
+  const provider = { ...worktreeProvider(repo), ...(options.durable === false ? { durable: false } : {}) };
   const worker = createWorker({
     repo: repo.repo, app: repo.app === '.' ? undefined : repo.app, origin: ORIGIN, shell: new Map(), provider, editClient: null,
     delivery: { github: options.github, tempRoot: scratch, beforeInstall: options.beforeInstall },
@@ -459,6 +461,8 @@ test('Open pull request pushes only the delivered commit, then creates the pull 
   await $`git push -q origin main`.cwd(t.repo).quiet();
   await $`git fetch -q origin`.cwd(t.repo).quiet();
   const gh = fakeGithub();
+  await $`git remote add upstream https://github.com/other/upstream.git`.cwd(t.repo).quiet();
+  await $`git config remote.upstream.gh-resolved base`.cwd(t.repo).quiet();
   const r = await run({ github: gh.run });
   await r.edited(h1, setText('Title; $(touch pwned)'));
   const made = await create(r, { slug: 'for-review' });
@@ -476,7 +480,9 @@ test('Open pull request pushes only the delivered commit, then creates the pull 
   const remoteRefs = (await $`git for-each-ref --format=${'%(refname) %(objectname)'}`.cwd(remote).quiet().text()).trim().split('\n');
   expect(remoteRefs).toContain(`refs/heads/neat/for-review ${commit}`);
   expect(remoteRefs).toHaveLength(2);
-  expect(gh.calls.map((c) => c.args[0] + ' ' + c.args[1])).toEqual(['auth status', 'auth status', 'pr list', 'pr create']);
+  expect(gh.calls.map((c) => c.args[0] + ' ' + c.args[1])).toEqual(['auth status', 'repo view', 'auth status', 'repo view', 'pr list', 'pr create']);
+  for (const call of gh.calls.filter(c => c.args[0] === 'pr')) expect(call.args[call.args.indexOf('--repo') + 1]).toBe('https://github.com/example/app');
+  expect(gh.calls.find(c => c.args[0] === 'repo')?.args.slice(2)).toEqual(['--json', 'url', '--', remote]);
   const create_ = gh.writes()[0]!;
   expect(create_.args.slice(0, 5)).toEqual(['pr', 'create', '--head', 'neat/for-review', '--base']);
   expect(create_.args).toContain('--base');
@@ -486,6 +492,16 @@ test('Open pull request pushes only the delivered commit, then creates the pull 
   expect(await Bun.file(join(t.repo, 'pwned')).exists()).toBe(false);
   expect(await snapshot(t.repo)).toEqual(before);
   await r.close();
+});
+
+test('explicit GitHub destinations resolve SSH aliases and remove URL credentials', async () => {
+  const { githubRepository } = await import('./delivery');
+  const alias = async (host: string) => host === 'work-alias' ? 'github.com' : host;
+  expect(await githubRepository('git@work-alias:owner/repo.git', alias)).toBe('https://github.com/owner/repo.git');
+  expect(await githubRepository('work-alias:owner/repo.git', alias)).toBe('https://github.com/owner/repo.git');
+  expect(await githubRepository('ssh://git@work-alias:2222/owner/repo.git', alias)).toBe('https://github.com/owner/repo.git');
+  expect(await githubRepository('https://user:fake-password@github.com/owner/repo.git', alias)).toBe('https://github.com/owner/repo.git');
+  expect(await githubRepository('/path/to/origin.git', alias)).toBe('/path/to/origin.git');
 });
 
 test('an existing open pull request for the delivered branch is reused', async () => {
@@ -572,7 +588,7 @@ test('the delivery view survives a browser reload and a new delivery clears the 
   await r.close();
 });
 
-test('exports remain bound to their directory when its path is swapped for a symlink', async () => {
+for (const useProcess of [false, true]) test(`exports stay directory-bound during swaps with process fallback ${useProcess}`, async () => {
   const { readExport, exportSeries } = await import('./delivery');
   const { rename } = await import('node:fs/promises');
   const r = await run();
@@ -585,16 +601,39 @@ test('exports remain bound to their directory when its path is swapped for a sym
   await mkdir(outside);
   await writeFile(join(outside, name), 'outside secret');
   const safe = await readFile(join(original, name));
-  const read = await readExport(name, { beforeFile: async () => { await rename(original, parked); await symlink(outside, original); } });
+  const read = await readExport(name, { useProcess, beforeFile: async () => { await rename(original, parked); await symlink(outside, original); } });
   expect(read).toEqual(new Uint8Array(safe));
   expect(await readFile(join(outside, name), 'utf8')).toBe('outside secret');
   await rm(original); await rename(parked, original);
   const commits = (await $`git rev-list --reverse ${await head(t.repo)}..HEAD`.cwd(r.dir).quiet().text()).trim().split('\n');
   const saved = await exportSeries({ repo: t.repo, sandboxRoot: r.dir, baseCommit: await head(t.repo), expectedCommits: commits }, {
-    slug: 'pinned', beforeFile: async () => { await rename(original, parked); await symlink(outside, original); },
+    slug: 'pinned', useProcess, beforeFile: async () => { await rename(original, parked); await symlink(outside, original); },
   });
   expect((await readFile(join(parked, saved.name), 'utf8'))).toContain('Change text');
   expect(await readdir(outside)).toEqual([name]);
+  await r.close();
+});
+
+test('the export helper refuses a directory swapped before startup without loading its preloads', async () => {
+  const { readExport } = await import('./delivery');
+  const { rename } = await import('node:fs/promises');
+  const r = await run();
+  await keepTwo(r);
+  const exported = await r.call(`${r.delivery}/export`, 'POST', {});
+  const outside = join(scratch, 'outside');
+  await mkdir(outside);
+  const marker = join(outside, 'executed');
+  await writeFile(join(outside, 'bunfig.toml'), 'preload = ["./preload.ts"]\n');
+  await writeFile(join(outside, 'preload.ts'), `await Bun.write(${JSON.stringify(marker)}, 'executed');`);
+  await expect(readExport(exported.json.file!, {
+    useProcess: true,
+    beforeStart: async () => {
+      await rename(join(t.home, 'exports'), join(t.home, 'parked'));
+      await symlink(outside, join(t.home, 'exports'));
+    },
+  })).rejects.toMatchObject({ code: 'EXPORT_MISSING' });
+  expect(await Bun.file(marker).exists()).toBe(false);
+  expect((await readdir(outside)).sort()).toEqual(['bunfig.toml', 'preload.ts']);
   await r.close();
 });
 
@@ -647,5 +686,17 @@ test('the PR endpoint refuses while a shared proposal is waiting', async () => {
   expect(result.status).toBe(409);
   expect(result.json.code).toBe('PENDING_PROPOSAL');
   expect(gh.calls).toEqual([]);
+  await r.close();
+});
+
+test('providers without durable passes cannot create a branch or patch', async () => {
+  const r = await run({ durable: false });
+  await keepTwo(r);
+  for (const action of ['branch', 'export']) {
+    const result = await r.call(`${r.delivery}/${action}`, 'POST', {});
+    expect(result.status).toBe(409);
+    expect(result.json.code).toBe('DELIVERY_UNAVAILABLE');
+  }
+  expect((await $`git branch --list ${'neat/*'}`.cwd(t.repo).quiet().text()).trim()).toBe('');
   await r.close();
 });

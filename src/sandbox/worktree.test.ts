@@ -253,3 +253,70 @@ test('a worktree can start at an earlier commit, and a base that is not a commit
     } finally { await removeWorktree(session); }
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
+
+test('generated local lockfiles are reused only when the sandbox manifest matches', async () => {
+  const { copyLocalLocks } = await import('./worktree');
+  const { mkdtemp, mkdir, readFile, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const temp = await mkdtemp(join(tmpdir(), 'neat-lock-copy-'));
+  try {
+    const source = join(temp, 'source'), target = join(temp, 'target');
+    await mkdir(source); await mkdir(target);
+    await writeFile(join(source, 'package.json'), '{"dependencies":{"next":"latest"}}');
+    await writeFile(join(target, 'package.json'), '{"dependencies":{"next":"latest"}}');
+    await writeFile(join(source, 'bun.lock'), 'generated lock');
+    await writeFile(join(source, 'bun.lockb'), new Uint8Array([0, 255, 1, 128]));
+    await copyLocalLocks(source, target);
+    expect(await readFile(join(target, 'bun.lock'), 'utf8')).toBe('generated lock');
+    expect([...await readFile(join(target, 'bun.lockb'))]).toEqual([0, 255, 1, 128]);
+    await rm(join(target, 'bun.lock'));
+    await rm(join(target, 'bun.lockb'));
+    await writeFile(join(source, 'package.json'), '{"dependencies":{"next":"17"}}');
+    await copyLocalLocks(source, target);
+    expect(await readFile(join(target, 'bun.lock'), 'utf8').catch(() => 'missing')).toBe('missing');
+    await writeFile(join(target, 'bun.lock'), 'committed lock');
+    await copyLocalLocks(source, target);
+    expect(await readFile(join(target, 'bun.lock'), 'utf8')).toBe('committed lock');
+  } finally { await rm(temp, { recursive: true, force: true }); }
+});
+
+test('a pnpm workspace reuses package-local links only with matching manifests and a matching root lock', async () => {
+  const { reuseWorkspaceDependencies } = await import('./worktree');
+  const { mkdtemp, mkdir, writeFile, readFile, symlink, realpath, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const temp = await mkdtemp(join(tmpdir(), 'neat-pnpm-links-'));
+  try {
+    const source = join(temp, 'source'), target = join(temp, 'target');
+    for (const root of [source, target]) {
+      await mkdir(join(root, 'apps/web'), { recursive: true });
+      await mkdir(join(root, 'packages/ui'), { recursive: true });
+      await writeFile(join(root, 'package.json'), '{"private":true}');
+      await writeFile(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9');
+      await writeFile(join(root, 'apps/web/package.json'), '{"name":"web"}');
+      await writeFile(join(root, 'packages/ui/package.json'), '{"name":"ui"}');
+    }
+    await mkdir(join(source, 'node_modules/.pnpm/next/node_modules/next'), { recursive: true });
+    await writeFile(join(source, 'node_modules/.pnpm/next/node_modules/next/package.json'), '{"version":"16.2.6"}');
+    await mkdir(join(source, 'apps/web/node_modules'));
+    await symlink('../../../node_modules/.pnpm/next/node_modules/next', join(source, 'apps/web/node_modules/next'));
+    await mkdir(join(source, 'packages/ui/node_modules'));
+    await writeFile(join(source, 'packages/ui/node_modules/helper.js'), 'export const ready = true;');
+    await reuseWorkspaceDependencies(source, target);
+    expect(await readFile(join(target, 'apps/web/node_modules/next/package.json'), 'utf8')).toBe('{"version":"16.2.6"}');
+    expect(await realpath(join(target, 'apps/web/node_modules/next'))).toStartWith(target);
+    expect(await readFile(join(target, 'packages/ui/node_modules/helper.js'), 'utf8')).toBe('export const ready = true;');
+    await rm(join(target, 'packages/ui/node_modules'), { recursive: true });
+    await writeFile(join(target, 'packages/ui/package.json'), '{"name":"changed"}');
+    await reuseWorkspaceDependencies(source, target);
+    expect(await readFile(join(target, 'packages/ui/node_modules/helper.js'), 'utf8').catch(() => 'missing')).toBe('missing');
+    const outside = join(temp, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'package.json'), '{"name":"ui"}');
+    await rm(join(target, 'packages/ui'), { recursive: true });
+    await symlink(outside, join(target, 'packages/ui'));
+    await reuseWorkspaceDependencies(source, target);
+    expect(await readFile(join(outside, 'node_modules/helper.js'), 'utf8').catch(() => 'missing')).toBe('missing');
+  } finally { await rm(temp, { recursive: true, force: true }); }
+});

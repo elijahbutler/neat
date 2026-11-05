@@ -83,10 +83,15 @@ export function consumerFiles(index: RepoIndex, changed: string[]): string[] {
   const edited = new Set(changed);
   const ids = new Set(index.profile.components.filter((c) => edited.has(c.file)).map((c) => `${c.file}:${c.line}`));
   const files = new Set<string>();
-  for (const [owner, rendered] of Object.entries(index.renders)) {
-    if (!rendered.some((id) => ids.has(id))) continue;
-    const file = owner.slice(0, owner.lastIndexOf(':'));
-    if (!edited.has(file)) files.add(file);
+  let expanded = true;
+  while (expanded) {
+    expanded = false;
+    for (const [owner, rendered] of Object.entries(index.renders)) {
+      if (!rendered.some((id) => ids.has(id))) continue;
+      if (!ids.has(owner)) { ids.add(owner); expanded = true; }
+      const file = owner.slice(0, owner.lastIndexOf(':'));
+      if (!edited.has(file)) files.add(file);
+    }
   }
   return [...files].sort();
 }

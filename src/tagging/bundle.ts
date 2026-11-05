@@ -63,7 +63,7 @@ export async function sandboxWriteTarget(rootDir: string, target: string): Promi
 
 
 /** Replace the destination itself. Never open it for a write, even if it becomes a symlink. */
-export async function sandboxWrite(rootDir: string, target: string, contents: string, mode = 0o600): Promise<void> {
+export async function sandboxWrite(rootDir: string, target: string, contents: string | Uint8Array, mode = 0o600): Promise<void> {
   const path = await sandboxWriteTarget(rootDir, target);
   const parent = dirname(path);
   const directory = await open(parent, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);

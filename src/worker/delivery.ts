@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 const FAILURES = {
+  DELIVERY_UNAVAILABLE: [409, 'Branch and patch delivery require the default local preview.'],
   NO_COMMITS: [422, 'This pass has no kept steps to deliver.'],
   NO_CHANGES: [422, 'The kept steps cancel each other out, so there is nothing to deliver.'],
   PENDING_CHANGE: [409, 'Keep or undo the change waiting in the editor before delivering.'],
@@ -46,7 +47,7 @@ export class DeliveryError extends Error {
   }
 }
 
-const MAX_SERIES_BYTES = 32 * 1024 * 1024;
+export const MAX_SERIES_BYTES = 32 * 1024 * 1024;
 const MAX_SUFFIX = 50;
 const NO_HOOKS = '/dev/null';
 
@@ -251,24 +252,58 @@ export interface ExportedPatch { name: string; bytes: number; commits: number; f
 async function openExportRoot() {
   const path = exportsHome();
   await mkdir(path, { recursive: true, mode: 0o700 });
-  const info = await lstat(path);
+  const info = await lstat(path, { bigint: true });
   if (!info.isDirectory() || info.isSymbolicLink()) throw new DeliveryError('EXPORT_UNSAFE');
   const root = await realpath(path);
   const directory = await open(root, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW).catch(() => { throw new DeliveryError('EXPORT_UNSAFE'); });
-  const pinned = await directory.stat();
+  const pinned = await directory.stat({ bigint: true });
   if (pinned.ino !== info.ino || pinned.dev !== info.dev) { await directory.close(); throw new DeliveryError('EXPORT_UNSAFE'); }
   // Descriptor-relative paths keep creation, reads, and cleanup bound to this directory if its name is replaced.
-  return { directory, base: `${process.platform === 'linux' ? '/proc/self/fd' : '/dev/fd'}/${directory.fd}` };
+  return { directory, root, device: String(pinned.dev), inode: String(pinned.ino), base: `/proc/self/fd/${directory.fd}` };
+}
+
+/** Non-Linux fallback: a child validates its cwd identity, then performs relative operations there. */
+async function directoryProcess(root: Awaited<ReturnType<typeof openExportRoot>>, mode: 'read' | 'write', name: string, input: Uint8Array, beforeFile?: () => Promise<void>): Promise<Uint8Array<ArrayBuffer>> {
+  const child = Bun.spawn([process.execPath, '--no-env-file', `--config=${join(import.meta.dir, 'export-process.toml')}`, join(import.meta.dir, 'export-file.ts'), mode, name, root.device, root.inode, root.root], {
+    cwd: import.meta.dir, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore', env: {}, timeout: 30_000,
+  });
+  const reader = child.stdout.getReader();
+  try {
+    const ready = await reader.read();
+    if (ready.done || new TextDecoder().decode(ready.value) !== 'READY\n') throw new DeliveryError(mode === 'read' ? 'EXPORT_MISSING' : 'EXPORT_UNSAFE');
+    await beforeFile?.();
+    child.stdin.write(input);
+    child.stdin.end();
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      length += part.value.length;
+      if (length > MAX_SERIES_BYTES) throw new DeliveryError('TOO_LARGE');
+      chunks.push(part.value);
+    }
+    if (await child.exited !== 0) throw new DeliveryError(mode === 'read' ? 'EXPORT_MISSING' : 'EXPORT_UNSAFE');
+    const out = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
+    return out;
+  } finally { reader.releaseLock(); if (child.exitCode === null) child.kill(); await child.exited; }
 }
 
 /** Write a mailbox through a pinned directory descriptor. The request never picks a filesystem path. */
-export async function exportSeries(source: DeliverySource, options: { slug: string; now?: Date; beforeFile?: () => Promise<void> }): Promise<ExportedPatch> {
+export async function exportSeries(source: DeliverySource, options: { slug: string; now?: Date; beforeFile?: () => Promise<void>; useProcess?: boolean }): Promise<ExportedPatch> {
   const series = await readSeries(source);
   const stamp = (options.now ?? new Date()).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   const name = `neat-${options.slug}-${stamp}-${randomBytes(4).toString('hex')}.patch`;
   if (!isExportName(name)) throw new DeliveryError('DELIVERY_FAILED');
-  const { directory, base } = await openExportRoot();
+  const pinned = await openExportRoot();
+  const { directory, base } = pinned;
   try {
+    if (process.platform !== 'linux' || options.useProcess) {
+      await directoryProcess(pinned, 'write', name, series.mbox, options.beforeFile);
+      return { name, bytes: series.mbox.length, commits: series.commits.length, files: series.files };
+    }
     await options.beforeFile?.();
     const path = join(base, name);
     const handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600).catch(() => { throw new DeliveryError('EXPORT_UNSAFE'); });
@@ -280,10 +315,15 @@ export async function exportSeries(source: DeliverySource, options: { slug: stri
 }
 
 /** Read only through the pinned export directory and refuse links at the file itself. */
-export async function readExport(name: string, options: { beforeFile?: () => Promise<void> } = {}): Promise<Uint8Array<ArrayBuffer>> {
+export async function readExport(name: string, options: { beforeFile?: () => Promise<void>; beforeStart?: () => Promise<void>; useProcess?: boolean } = {}): Promise<Uint8Array<ArrayBuffer>> {
   if (!isExportName(name)) throw new DeliveryError('EXPORT_MISSING');
-  const { directory, base } = await openExportRoot();
+  const pinned = await openExportRoot();
+  const { directory, base } = pinned;
   try {
+    if (process.platform !== 'linux' || options.useProcess) {
+      await options.beforeStart?.();
+      return await directoryProcess(pinned, 'read', name, new Uint8Array(), options.beforeFile);
+    }
     await options.beforeFile?.();
     const handle = await open(join(base, name), constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => { throw new DeliveryError('EXPORT_MISSING'); });
     try {
@@ -335,6 +375,32 @@ async function resolveBase(repo: string, requested: string | undefined): Promise
 const listedSchema = z.array(z.object({ url: z.string().url(), headRefName: z.string(), isCrossRepository: z.boolean() }));
 const pullUrl = (text: string) => text.split('\n').map((line) => line.trim()).reverse().find((line) => /^https:\/\/[^\s]+\/pull\/\d+$/.test(line));
 
+async function sshHostname(host: string): Promise<string> {
+  try {
+    const child = Bun.spawn(['ssh', '-G', '--', host], { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', timeout: 5_000 });
+    const [text, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+    const hostname = /^hostname\s+([^\s]+)$/m.exec(text)?.[1];
+    return code === 0 && hostname && /^[a-zA-Z0-9.-]+$/.test(hostname) ? hostname : host;
+  } catch { return host; }
+}
+
+/** Resolve SSH aliases before passing an explicit push destination to the GitHub CLI. */
+export async function githubRepository(remote: string, hostname: (host: string) => Promise<string> = sshHostname): Promise<string> {
+  let url: URL | null = null;
+  try { url = new URL(remote); } catch { /* A local path or SCP-style remote is not a URL. */ }
+  if (url && ['http:', 'https:', 'ssh:', 'git:'].includes(url.protocol)) {
+    url.username = ''; url.password = '';
+    if (url.protocol === 'ssh:') {
+      const host = await hostname(url.hostname);
+      return `https://${host}${url.pathname}`;
+    }
+    return url.toString();
+  }
+  const scp = /^(?:[^@/:]+@)?([^/:]+):(.+)$/.exec(remote);
+  if (scp) return `https://${await hostname(scp[1]!)}/${scp[2]}`;
+  return remote;
+}
+
 export interface OpenedPullRequest { url: string; reused: boolean; base: string }
 export interface PullRequestInput {
   repo: string;
@@ -359,18 +425,26 @@ export async function openPullRequest(input: PullRequestInput, run: GithubRunner
   const current = await runGit(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}^{commit}`]);
   if (current.code !== 0 || decode(current.out).trim() !== commit) throw new DeliveryError('BRANCH_CHANGED');
   if ((await runGit(repo, ['remote', 'get-url', 'origin'])).code !== 0) throw new DeliveryError('NO_ORIGIN');
+  const remote = await gitOk(repo, ['remote', 'get-url', '--push', 'origin']);
+  let repository = await githubRepository(remote);
+  const resolved = await run(['repo', 'view', '--json', 'url', '--', repository], { cwd: repo });
+  const parsedRepo = z.object({ url: z.string().url().refine(value => new URL(value).protocol === 'https:') }).safeParse(
+    await Promise.resolve().then(() => JSON.parse(resolved.out)).catch(() => null),
+  );
+  if (resolved.code !== 0 || !parsedRepo.success) throw new DeliveryError('GITHUB_FAILED');
+  repository = parsedRepo.data.url;
   const base = await resolveBase(repo, input.baseBranch);
   const pushed = await runGit(repo, ['push', '--porcelain', '--no-verify', '--no-follow-tags', 'origin', `${commit}:refs/heads/${branch}`], { timeoutMs: 120_000 });
   if (pushed.code !== 0) throw new DeliveryError(decode(pushed.out).includes('[rejected]') ? 'PUSH_REJECTED' : 'PUSH_FAILED');
 
-  const listed = await run(['pr', 'list', '--head', branch, '--base', base, '--state', 'open', '--limit', '5', '--json', 'url,headRefName,isCrossRepository'], { cwd: repo });
+  const listed = await run(['pr', 'list', '--head', branch, '--base', base, '--state', 'open', '--limit', '5', '--json', 'url,headRefName,isCrossRepository', '--repo', repository], { cwd: repo });
   if (listed.code !== 0) throw new DeliveryError('GITHUB_FAILED');
   const parsed = listedSchema.safeParse(JSON.parse(listed.out || '[]'));
   if (!parsed.success) throw new DeliveryError('GITHUB_FAILED');
   const existing = parsed.data.find((pr) => pr.headRefName === branch && !pr.isCrossRepository);
   if (existing) return { url: existing.url, reused: true, base };
 
-  const created = await run(['pr', 'create', '--head', branch, '--base', base, `--title=${input.title}`, '--body-file', '-'], { cwd: repo, input: input.body });
+  const created = await run(['pr', 'create', '--head', branch, '--base', base, `--title=${input.title}`, '--body-file', '-', '--repo', repository], { cwd: repo, input: input.body });
   const url = created.code === 0 ? pullUrl(created.out) : undefined;
   if (!url) throw new DeliveryError('GITHUB_FAILED');
   return { url, reused: false, base };
