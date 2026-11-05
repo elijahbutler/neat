@@ -17,11 +17,13 @@ interface Statement {
   expression?: { type: string; start: number; left?: { type: string; object?: { name?: string }; property?: { name?: string } }; right?: { start: number } };
 }
 
-function wrapper(kind: 'esm' | 'cjs', opts: TaggingBundle & { root: string }): string {
+type InjectionOptions = TaggingBundle & { root: string; editorOrigin?: string };
+
+function wrapper(kind: 'esm' | 'cjs', opts: InjectionOptions): string {
   // Next compiles TypeScript configs to CommonJS. Keep the absolute path in a variable so compiler aliases cannot rewrite it.
   const url = JSON.stringify(kind === 'cjs' ? opts.withTaggingCjsPath ?? opts.withTaggingPath : opts.withTaggingPath);
-  const options = JSON.stringify({ loaderPath: opts.loaderPath, root: opts.root });
-  const body = `{\n  const neatTaggingPath = ${url};\n  const { withNeatTagging } = await import(neatTaggingPath);\n  return withNeatTagging(${ORIGINAL}, ${options})(phase, context);\n}\n`;
+  const options = JSON.stringify({ loaderPath: opts.loaderPath, root: opts.root, editorOrigin: opts.editorOrigin });
+  const body = `{\n  const neatTaggingPath = ${url};\n  const neatTaggingModule = await import(neatTaggingPath);\n  const { withNeatTagging } = neatTaggingModule.default ?? neatTaggingModule;\n  return withNeatTagging(${ORIGINAL}, ${options})(phase, context);\n}\n`;
   return kind === 'esm'
     ? `\nexport default async function neatTaggedConfig(phase, context) ${body}`
     : `\nmodule.exports = async function neatTaggedConfig(phase, context) ${body}`;
@@ -31,7 +33,7 @@ function wrapper(kind: 'esm' | 'cjs', opts: TaggingBundle & { root: string }): s
  * Rewrites a next.config so its original export is wrapped by withNeatTagging.
  * Only used on a sandbox copy; the customer's repo never sees this change.
  */
-export function rewriteNextConfig(source: string, fileName: string, opts: TaggingBundle & { root: string }): string {
+export function rewriteNextConfig(source: string, fileName: string, opts: InjectionOptions): string {
   const typescript = /\.m?ts$/.test(fileName);
   const program = parse(source, { sourceType: 'module', plugins: typescript ? ['typescript'] : [] }).program;
   const body = program.body as unknown as Statement[];
@@ -85,9 +87,9 @@ export async function resolveNextVersion(projectDir: string): Promise<string> {
 }
 
 /** Rewrites the project's next.config (or creates one) to load the tagging loader. Returns the file name. */
-export async function injectTagging(projectDir: string, bundle: TaggingBundle): Promise<string> {
+export async function injectTagging(projectDir: string, bundle: TaggingBundle, editorOrigin?: string): Promise<string> {
   // Bundlers report real paths (/private/var/... on macOS), so the root must be the real path too.
-  const opts = { ...bundle, root: await realpath(projectDir) };
+  const opts = { ...bundle, root: await realpath(projectDir), editorOrigin };
   const existing = CONFIG_FILES.find((f) => existsSync(join(projectDir, f)));
   const file = existing ?? 'next.config.mjs';
   const source = existing ? await readFile(join(projectDir, existing), 'utf8') : 'export default {};\n';
@@ -117,7 +119,7 @@ export interface PreparedTagging {
 }
 
 /** Prepare an isolated checkout. Call exactly once, after its base commit is recorded. */
-export async function prepareTaggedProject(projectDir: string, bridge: string, nextVersion?: string): Promise<PreparedTagging> {
+export async function prepareTaggedProject(projectDir: string, bridge: string, nextVersion?: string, editorOrigin?: string): Promise<PreparedTagging> {
   const version = nextVersion ?? await resolveNextVersion(projectDir);
   const [major = 0, minor = 0] = version.split('.').map(Number);
   const legacy = major < 15 || (major === 15 && minor < 3);
@@ -133,7 +135,7 @@ export async function prepareTaggedProject(projectDir: string, bridge: string, n
   if (legacy) await discover(`${prefix}app`);
   if (legacy && !layouts.length) throw new Error('No App Router root layout found for the Next <15.3 bridge fallback');
   const bundle = await buildTaggingBundle(join(projectDir, '.neat'), legacy ? layouts : undefined, projectDir);
-  const configPath = await injectTagging(projectDir, bundle);
+  const configPath = await injectTagging(projectDir, bundle, editorOrigin);
   const clientDir = existsSync(join(projectDir, 'app')) ? projectDir : join(projectDir, 'src');
   const client = ['ts', 'js', 'mjs'].map(ext => join(clientDir, `instrumentation-client.${ext}`)).find(existsSync)
     ?? join(clientDir, 'instrumentation-client.js');

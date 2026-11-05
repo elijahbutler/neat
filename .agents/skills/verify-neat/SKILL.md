@@ -54,7 +54,7 @@ Read `GET /api/editor/sessions` until one session appears with this run's dispos
 
 On failure, capture startup and session responses and `GET /api/editor/sessions/<id>/logs` when a session exists, then inspect the worker log. These endpoints need no sign-in. Host and Origin must match the allocated editor origin.
 
-The API has no build-revision endpoint. Use `report.json` and `checkout.diff` to identify the launched source. The report records source HEAD and status, reported Bun and Node versions, runner arguments, and the diff's SHA-256. Its launch records include the worker command and PID and the preview's recorded process identity. Require the SHA-256 of `checkout.diff` to match `source.diffSha256`. Do not infer the running revision from the checkout alone. GET reads provide observations; keep feature mutations in the browser.
+The API has no build-revision endpoint. Use `report.json` and `checkout.diff` to identify the launched source. The report records source HEAD and status, runtime metadata, runner arguments, and the diff's SHA-256. Runtime metadata separates `bunNodeCompatibility` from the actual `node` version and `nodeExecPath` selected by the sanitized launch PATH. `nodeProvenance` identifies this as a probe before CLI launch. Its launch records include the worker command and PID and the preview's recorded process identity. Require the SHA-256 of `checkout.diff` to match `source.diffSha256`. Do not infer the running revision from the checkout alone. GET reads provide observations; keep feature mutations in the browser.
 
 ## Drive
 

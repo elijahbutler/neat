@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { parseOptions, repository } from './verification/options.mjs';
 import { git, gitEnvironment, snapshot } from './verification/fixture.mjs';
-import { cliArguments, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
+import { cliArguments, cliEnvironment, runtimeMetadata, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
 import { poll } from './verification/browser.mjs';
 
 const driver = join(tmpdir(), 'browser-driver', 'index.mjs');
@@ -61,6 +61,53 @@ describe('browser acceptance command', () => {
 });
 
 describe('browser acceptance isolation', () => {
+  test('runtime metadata probes the PATH-selected Node with the sanitized CLI environment', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'neat-runtime-test-'));
+    const node = join(root, 'node'), marker = join(root, 'preload-ran'), observed = join(root, 'environment.json');
+    const preload = join(root, 'preload.mjs');
+    const inherited = {
+      PATH: root, NODE_OPTIONS: `--require=${preload}`, NODE_PRELOAD: preload, BUN_OPTIONS: `--preload=${preload}`,
+      LLM_API_KEY: 'host-secret', OPENAI_API_KEY: 'host-openai-secret', OPENAI_BASE_URL: 'https://invalid.example.test',
+    };
+    const original = Object.fromEntries(Object.keys(inherited).map(key => [key, process.env[key]]));
+    try {
+      await writeFile(preload, `await Bun.write(${JSON.stringify(marker)}, 'host preload executed');\n`);
+      // Emulate Node's --require behavior while keeping this test on Bun.
+      await writeFile(node, `#!${process.execPath} --no-env-file
+if (process.env.NODE_OPTIONS) await import(process.env.NODE_OPTIONS.slice('--require='.length));
+await Bun.write(${JSON.stringify(observed)}, JSON.stringify({
+  nodeOptions: process.env.NODE_OPTIONS ?? null, nodePreload: process.env.NODE_PRELOAD ?? null,
+  bunOptions: process.env.BUN_OPTIONS ?? null, key: process.env.LLM_API_KEY ?? null,
+  openaiKey: process.env.OPENAI_API_KEY ?? null, base: process.env.OPENAI_BASE_URL ?? null,
+}));
+if (process.argv[2] === '--version') process.stdout.write('v24.22.2\\n');
+else if (process.argv[2] === '--print' && process.argv[3] === 'process.execPath') process.stdout.write(${JSON.stringify(node)} + '\\n');
+else process.exit(2);
+`, { mode: 0o700 });
+      const control = Bun.spawn([node, '--version'], {
+        env: { PATH: root, NODE_OPTIONS: `--require=${preload}` }, stdout: 'pipe', stderr: 'pipe',
+      });
+      expect(await new Response(control.stdout).text()).toBe('v24.22.2\n');
+      expect(await control.exited).toBe(0);
+      expect(await readFile(marker, 'utf8')).toBe('host preload executed');
+      await rm(marker);
+      Object.assign(process.env, inherited);
+      const runtime = await runtimeMetadata(cliEnvironment({ home: join(root, 'state'), root, providerPort: 4472 }));
+      expect(runtime.node).toBe('v24.22.2');
+      expect(runtime.nodeExecPath).toBe(node);
+      expect(runtime.bunNodeCompatibility).toBe(process.versions.node);
+      expect(runtime.nodeProvenance).toBe('PATH selection before CLI launch');
+      expect(JSON.parse(await readFile(observed, 'utf8'))).toEqual({
+        nodeOptions: null, nodePreload: null, bunOptions: null, key: null,
+        openaiKey: 'acceptance-fake-key', base: 'http://127.0.0.1:4472/v1',
+      });
+      expect(await readFile(marker, 'utf8').catch(error => error.code)).toBe('ENOENT');
+    } finally {
+      for (const [key, value] of Object.entries(original)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('CLI invocation prevents Bun from loading credentials from a repository env file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'neat-env-test-'));
     try {

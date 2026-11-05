@@ -60,6 +60,29 @@ describe('rewriteNextConfig', () => {
 });
 
 describe('injectTagging', () => {
+  for (const file of ['next.config.js', 'next.config.cjs', 'next.config.ts', 'next.config.mts']) {
+    test(`Node loads the real CommonJS tagging bundle through ${file}`, async () => {
+      const project = await mkdtemp(join(dir, 'node-config-'));
+      await writeFile(join(project, 'package.json'), JSON.stringify({ type: file.endsWith('ts') ? 'module' : 'commonjs' }));
+      const bundle = await buildTaggingBundle(join(project, '.neat'));
+      await writeFile(join(project, file), file.endsWith('ts')
+        ? 'export default async (phase: string) => ({ poweredByHeader: false, env: { CONFIG_PHASE: phase } });'
+        : 'module.exports = async phase => ({ poweredByHeader: false, env: { CONFIG_PHASE: phase } });');
+      await injectTagging(project, bundle, 'http://127.0.0.1:4460');
+      const script = `(async () => {
+        const imported = await import(${JSON.stringify(join(project, file))});
+        const result = await imported.default('phase-development-server', { defaultConfig: {} });
+        process.stdout.write(JSON.stringify({ poweredByHeader: result.poweredByHeader, phase: result.env.CONFIG_PHASE, headers: await result.headers() }));
+      })().catch(error => { console.error(error); process.exitCode = 1; });`;
+      const child = Bun.spawn(['node', ...(file.endsWith('ts') ? ['--experimental-strip-types'] : []), '--eval', script], { cwd: project, stdout: 'pipe', stderr: 'pipe' });
+      const [out, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+      expect(code, errors).toBe(0);
+      expect(JSON.parse(out)).toEqual({ poweredByHeader: false, phase: 'phase-development-server', headers: [
+        { source: '/:path*', headers: [{ key: 'content-security-policy', value: 'frame-ancestors http://127.0.0.1:4460' }] },
+      ] });
+    }, 30000);
+  }
+
   test('a compiled TypeScript config loads Neat independently of compiler path aliases', async () => {
     const project = await mkdtemp(join(dir, 'compiler-paths-'));
     await mkdir(join(project, 'node_modules'));

@@ -337,7 +337,7 @@ export function createWorktreeProvider(options: { homeDir?: string; app?: string
           await $`${installCommand(manager, await readdir(installRoot))}`.cwd(installRoot).quiet();
         }
         if (!existsSync(join(appDir, 'node_modules')) && existsSync(join(installRoot, 'node_modules'))) await symlink(join(installRoot, 'node_modules'), join(appDir, 'node_modules'), 'dir');
-        const tagged = await prepareTaggedProject(appDir, bridgeSource(editorOrigin));
+        const tagged = await prepareTaggedProject(appDir, bridgeSource(editorOrigin), undefined, editorOrigin);
         // A nested standalone app must not inherit an ancestor Next app's proxy/middleware.
         // Preserve an explicit user root; workspace repos keep their workspace root.
         const packageJson = JSON.parse(await readFile(join(installRoot, 'package.json'), 'utf8'));
