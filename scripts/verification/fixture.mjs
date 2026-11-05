@@ -25,7 +25,7 @@ export async function git(cwd, ...args) {
 
 export async function checkoutDiff() {
   let patch = await git(repository, 'diff', '--binary', 'HEAD');
-  const newFiles = (await git(repository, 'ls-files', '--others', '--exclude-standard', '-z', '--', 'scripts/verify-editor.mjs', 'scripts/verify-editor.test.ts', 'scripts/verification')).split('\0').filter(Boolean);
+  const newFiles = (await git(repository, 'ls-files', '--others', '--exclude-standard', '-z')).split('\0').filter(Boolean);
   for (const file of newFiles) {
     const result = await execute('git', ['diff', '--no-index', '--binary', '--', '/dev/null', file], { cwd: repository, env: gitEnvironment(), maxBuffer: 16 * 1024 * 1024 }).catch(error => {
       if (error.code === 1) return { stdout: error.stdout };

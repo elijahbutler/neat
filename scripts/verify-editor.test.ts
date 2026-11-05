@@ -6,8 +6,22 @@ import { spawn } from 'node:child_process';
 import { parseOptions, repository } from './verification/options.mjs';
 import { git, gitEnvironment, snapshot } from './verification/fixture.mjs';
 import { cliArguments, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
+import { poll } from './verification/browser.mjs';
 
 const driver = join(tmpdir(), 'browser-driver', 'index.mjs');
+
+test('acceptance polling propagates cancellation even when a read throws', async () => {
+  const abort = new AbortController();
+  const observations: string[] = [];
+  const result = poll('cancelled preparation', async () => {
+    observations.push('preparing');
+    abort.abort(new Error('Acceptance interrupted'));
+    throw new Error('Transient read failure');
+  }, () => false, 500, abort.signal);
+  await expect(result).rejects.toThrow('Acceptance interrupted');
+  expect(observations).toEqual(['preparing']);
+  expect(await poll('ready preparation', async () => 'ready', value => value === 'ready', 1000)).toBe('ready');
+});
 
 describe('browser acceptance command', () => {
   test('parses a dedicated run without inheriting model or port environment settings', () => {

@@ -4,6 +4,7 @@ import { buildShell } from './shell';
 import { allocatePort, createWorktreeProvider, reclaimSessions } from '../sandbox/worktree';
 import type { SandboxProvider } from '../sandbox/docker';
 import { randomBytes } from 'node:crypto';
+import type { StartupState } from './startup';
 import { realpath } from 'node:fs/promises';
 import { Node, type Project } from 'ts-morph';
 import { createCatalogueClient, type CatalogueReference } from '../catalogue/client';
@@ -84,6 +85,7 @@ interface DeliveryState {
 
 const sessions = new Map<string, Session>();
 let starting: Promise<Session> | undefined;
+let startup: StartupState = { phase: 'idle' };
 let closing = false;
 const catalogue = createCatalogueClient();
 const client = options.editClient !== undefined ? options.editClient : config ? createEditClient(config) : null;
@@ -535,6 +537,7 @@ async function handle(req: Request): Promise<Response> {
   const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
 
   if (parts[0] === 'fixtures') return json({ fixtures: FIXTURES, model: MODEL, modelReady: client !== null, modelSetupNote: MODEL_SETUP_NOTE });
+  if (parts.length === 1 && parts[0] === 'startup' && req.method === 'GET') return json(startup);
   if (parts[0] !== 'sessions') return fail(404, 'Not found.');
 
   if (parts.length === 1) {
@@ -545,17 +548,25 @@ async function handle(req: Request): Promise<Response> {
     if (sessions.size) return json(view([...sessions.values()][0]!));
     if (closing) return fail(503, 'Editor is shutting down.');
     if (starting) return fail(409, 'A preview is already starting.');
+    const startedAt = new Date().toISOString();
+    startup = { phase: 'preparing', startedAt };
     // Registered synchronously, so a second request or a shutdown sees the start in progress.
     starting = (async () => {
       const plan = provider.durable ? await planPass(body.fresh === true) : null;
-      const info = await provider.start(id, options.repo, { editorOrigin: EDITOR_ORIGIN, baseCommit: plan?.baseCommit, restore: plan?.restore });
+      const info = await provider.start(id, options.repo, {
+        editorOrigin: EDITOR_ORIGIN, baseCommit: plan?.baseCommit, restore: plan?.restore,
+        onProgress: phase => { startup = { phase, startedAt }; },
+      });
       const created: Session = { id, fixture, info, state: 'starting', proposals: new ProposalStore(options.confirmation?.now, options.confirmation?.ttlMs) };
       try { await plan?.finish(created); } catch (error) { await provider.stop(info).catch(() => undefined); throw error; }
       sessions.set(id, created);
+      startup = { phase: 'starting', startedAt };
       return created;
     })();
     let session: Session;
-    try { session = await starting; } finally { starting = undefined; }
+    try { session = await starting; }
+    catch (error) { startup = { phase: 'failed', startedAt, error: 'Could not prepare the preview. Check the terminal and try again.' }; throw error; }
+    finally { starting = undefined; }
     return json(view(session), 201);
   }
 
@@ -565,11 +576,17 @@ async function handle(req: Request): Promise<Response> {
 
   if (!action && req.method === 'GET') {
     s.state = await provider.state(s.info);
+    if (sessions.get(s.id) === s && startup.phase !== 'idle') {
+      const { startedAt } = startup;
+      if (s.state === 'ready') startup = { phase: 'ready', startedAt };
+      if (s.state === 'failed' || s.state === 'stopped') startup = { phase: 'failed', startedAt, error: 'The preview stopped. Check the terminal and start it again.' };
+    }
     return json(view(s));
   }
   if (!action && req.method === 'DELETE') {
     await provider.stop(s.info);
     sessions.delete(s.id);
+    if (!sessions.size) startup = { phase: 'idle' };
     return json({ ok: true });
   }
   if (action === 'preview' && req.method === 'GET') {
@@ -656,10 +673,10 @@ export async function startWorker(options: WorkerOptions) {
   const onSignal = () => { void close().then(() => process.exit(0)); };
   process.on('SIGINT', onSignal);
   process.on('SIGTERM', onSignal);
+  console.log(`Editor: ${origin}/editor`);
   try {
     const response = await worker.fetch(new Request(`${origin}/api/editor/sessions`, { method: 'POST', headers: { host: new URL(origin).host, 'content-type': 'application/json' }, body: JSON.stringify({ fixture: options.repo }) }));
     if (!response.ok) throw new Error(await response.text());
-    console.log(`Editor: ${origin}/editor`);
     return { server, close, origin };
   } catch (error) { await close(); throw error; }
 }

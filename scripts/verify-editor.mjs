@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { help, isInside, parseOptions, repository } from './verification/options.mjs';
 import { checkoutDiff, git, prepareFixture, snapshot } from './verification/fixture.mjs';
 import { startScriptedProvider } from './verification/provider.mjs';
-import { exerciseEditor, poll } from './verification/browser.mjs';
+import { exerciseEditor, exerciseWorkspaceRecovery, poll } from './verification/browser.mjs';
 import { cliArguments, removeOwnedRoot, stopOwnedWorker } from './verification/process.mjs';
 
 if (process.argv.includes('--help')) {
@@ -40,7 +40,7 @@ async function main(options) {
     'Full accessibility audit',
   ], coverage: Object.fromEntries([
     'selection', 'text', 'propertyAndPendingUndo', 'reloadDuringInspection', 'keptUndo', 'reloadBeforeReply', 'reloadAfterReply',
-    'timeline', 'sharedConfirmation', 'routeNavigation', 'restart', 'delivery', 'artifactIntegrity',
+    'timeline', 'sharedConfirmation', 'routeNavigation', 'restart', 'delivery', 'artifactIntegrity', 'workspaceRecovery',
   ].map(phase => [phase, false])), provider: 'scripted HTTP through production adapter', cleanup: 'pending' };
   const events = [];
   const root = await mkdtemp(join(tmpdir(), 'neat-browser-run-'));
@@ -103,14 +103,29 @@ async function main(options) {
       aborted: abort.signal.aborted,
       exited: proc.exitCode !== null || proc.signalCode !== null,
       origin: /Editor: (http:\/\/127\.0\.0\.1:\d+)\/editor/.exec(workerOutput)?.[1],
-    }), state => state.aborted || state.exited || Boolean(state.origin), options.timeout);
+    }), state => state.aborted || state.exited || Boolean(state.origin), options.timeout, abort.signal);
     abort.signal.throwIfAborted();
     if (state.exited) throw new Error(`CLI exited ${proc.exitCode ?? proc.signalCode}: ${workerOutput.slice(-3000)}`);
     const origin = state.origin;
     assert.equal(origin, `http://127.0.0.1:${options.port}`, 'Requested editor port was free');
-    const response = await fetch(`${origin}/api/editor/sessions`, { signal: AbortSignal.timeout(options.timeout) });
-    assert.equal(response.status, 200);
-    const sessions = (await response.json()).sessions;
+    await page.goto(`${origin}/editor`);
+    const startup = await (await fetch(`${origin}/api/editor/startup`, { signal: AbortSignal.timeout(options.timeout) })).json();
+    report.launches.at(-1).startup = startup;
+    const progress = page.getByRole('status').filter({ hasText: /Preparing your preview|Preparing project dependencies|Restoring your saved pass|Starting your app|Connecting to your preview/ }).first();
+    if (await progress.isVisible()) {
+      report.launches.at(-1).startupVisible = await progress.innerText();
+      await page.screenshot({ path: join(evidence, `startup-${report.launches.length}.png`), fullPage: true });
+    }
+    const prepared = await poll('owned CLI session preparation', async () => {
+      abort.signal.throwIfAborted();
+      if (proc.exitCode !== null || proc.signalCode !== null) return { exited: true, sessions: [] };
+      const response = await fetch(`${origin}/api/editor/sessions`, { signal: AbortSignal.timeout(options.timeout) });
+      assert.equal(response.status, 200);
+      return { exited: false, sessions: (await response.json()).sessions };
+    }, state => state.exited || state.sessions.length === 1, options.timeout, abort.signal);
+    abort.signal.throwIfAborted();
+    assert.equal(prepared.exited, false, 'Owned CLI stayed alive through preparation');
+    const { sessions } = prepared;
     assert.equal(sessions.length, 1, 'This CLI owns exactly one session');
     const session = sessions[0];
     assert.equal(resolve(session.fixture), repo, 'Session belongs to the disposable fixture');
@@ -180,6 +195,20 @@ async function main(options) {
     report.inputAfter = await snapshot(repo);
     assert.deepEqual(report.inputAfter, before, 'Input HEAD, branch, status, index, and dirty bytes remain intact');
     await checkpoint('downloaded patch matches local branch, input HEAD/index/working tree intact', 'artifactIntegrity');
+    const retried = await exerciseWorkspaceRecovery({ page, origin, evidence, timeout: options.timeout, stopPreview: async () => {
+      const { processIdentity } = await import('../src/sandbox/worktree.ts');
+      const preview = report.launches.at(-1).previewProcess;
+      assert.equal(await processIdentity(preview.pid), preview.start, 'Failure probe targets the owned preview process');
+      process.kill(-preview.pid, 'SIGTERM');
+      await poll('owned preview stopped', async () => (await (await fetch(`${origin}/api/editor/sessions/${report.sessionId}`)).json()).state, state => state === 'failed', options.timeout, abort.signal);
+      const { logs } = await (await fetch(`${origin}/api/editor/sessions/${report.sessionId}/logs`)).json();
+      assert.ok(logs.trim(), 'Owned preview retained startup logs');
+      return { sessionId: report.sessionId, logs };
+    } });
+    const retryRecord = JSON.parse(await readFile(join(home, 'sessions/.registry', `${retried.id}.json`), 'utf8'));
+    report.previewRetry = { sessionId: retried.id, passId: retried.pass?.id, process: retryRecord.preview };
+    assert.equal(retried.pass?.id, report.passId, 'Retry resumes the same kept pass');
+    await checkpoint('native Reload preserves query and fragment, failed preview logs display, and Try again restores saved work', 'workspaceRecovery');
     assert.deepEqual(events.filter(event => event.kind === 'pageerror'), [], 'No uncaught browser errors');
     report.status = 'passed';
   } catch (error) {
