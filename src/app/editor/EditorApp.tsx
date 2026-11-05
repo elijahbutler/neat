@@ -4,6 +4,7 @@ import { Check, Loader2, Monitor, MousePointer2, Smartphone, Square, Tablet, Und
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { PanelOptions } from '../../edit/classes';
 import type { ProposalView } from '../../worker/confirmation';
+import type { BaseChoices, DeliveryView, GithubState } from '../../worker/delivery';
 import type { EditOperation } from '../../edit/operations';
 import type { StyleSource } from '../../edit/properties';
 import { moveTarget, patchLines, targetTags, textEditTracker, textOperation, type SelectedTarget } from './direct';
@@ -35,6 +36,8 @@ interface Session {
   proposal: ProposalView | null;
   /** What a restart found: steps put back, saved files skipped, and the first step that could not come back. */
   recovery: { restored: number; skipped: number; failure: { summary: string; reason: string } | null } | null;
+  /** Branches, patch files, and the pull request made from this pass. Comes back after a browser reload. */
+  delivery: DeliveryView | null;
 }
 /** Keep and Undo answer with the session plus where the tags the page holds now point (null when they can't be followed). */
 type Settled = Session & { nextTag: string | null; moved: Record<string, string | null> };
@@ -426,6 +429,9 @@ export function EditorApp() {
               ) : (
                 <p className="text-[15px] text-quiet">{session.state === 'ready' ? 'Click anything on the page to see which component and line it comes from. Double-click text to edit it.' : 'The inspector fills in once the preview is running.'}</p>
               )}
+              {session.timeline.some((step) => step.status === 'kept') && (
+                <DeliveryPanel session={session} blocked={!!session.pending || !!proposal || confirming || undoing !== null} onDelivery={(delivery) => setSession((current) => (current ? { ...current, delivery } : current))} />
+              )}
               {session.timeline.length > 0 && <Timeline steps={session.timeline} busy={undoing !== null || !!session.pending || !!proposal || confirming} undoing={undoing} onUndo={undoStep} />}
             </div>
 
@@ -663,6 +669,90 @@ function Timeline({ steps, busy, undoing, onUndo }: { steps: Step[]; busy: boole
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
+
+interface DeliveryInfo { delivery: DeliveryView | null; suggestedSlug: string; bases: BaseChoices | null; github: GithubState | null }
+type DeliveryAnswer = { delivery: DeliveryView; file?: string };
+
+function DeliveryPanel({ session, blocked, onDelivery }: { session: Session; blocked: boolean; onDelivery: (delivery: DeliveryView) => void }) {
+  const path = `sessions/${session.id}/delivery`;
+  const [info, setInfo] = useState<DeliveryInfo | null>(null);
+  const [slug, setSlug] = useState('');
+  const [base, setBase] = useState<'pass' | 'head'>('pass');
+  const [working, setWorking] = useState<'branch' | 'export' | 'pr' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const delivery = session.delivery;
+  const steps = session.timeline.length;
+
+  // Read the checkout and GitHub state again whenever the steps or the delivery change.
+  useEffect(() => {
+    let current = true;
+    api<DeliveryInfo>(path).then((next) => { if (current) { setInfo(next); setSlug((typed) => typed || next.suggestedSlug); } }).catch(() => undefined);
+    return () => { current = false; };
+  }, [path, steps, delivery?.branch?.name, delivery?.pr?.url]);
+
+  async function send(kind: 'branch' | 'export' | 'pr') {
+    setWorking(kind); setError(null);
+    try {
+      const body = kind === 'branch' ? { slug, base } : kind === 'export' ? { slug } : {};
+      const answer = await api<DeliveryAnswer>(`${path}/${kind}`, { method: 'POST', body });
+      onDelivery(answer.delivery);
+    } catch (e) { setError((e as Error).message); }
+    finally { setWorking(null); }
+  }
+
+  const idle = working === null && !blocked;
+  const advanced = info?.bases?.advanced && info.bases.head;
+  const short = (commit: string) => commit.slice(0, 7);
+  return (
+    <section className="space-y-3" aria-label="Deliver this pass">
+      <h2 className="caption text-quiet">Deliver</h2>
+      <div className="space-y-2">
+        <label htmlFor="delivery-slug" className="caption text-quiet">Branch name</label>
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[13px] text-quiet">neat/</span>
+          <input id="delivery-slug" value={slug} onChange={(e) => setSlug(e.target.value)} maxLength={48} spellCheck={false} className="min-w-0 flex-1 rounded-[6px] border border-ink bg-page px-2 py-1 font-mono text-[13px]" />
+        </div>
+        <label htmlFor="delivery-base" className="caption text-quiet">Start from</label>
+        <select id="delivery-base" value={base} onChange={(e) => setBase(e.target.value === 'head' ? 'head' : 'pass')} className="w-full rounded-[6px] border border-ink bg-page px-2 py-1 text-[13px]">
+          <option value="pass">The commit this pass started from{info?.bases ? ` (${short(info.bases.pass.commit)})` : ''}</option>
+          {advanced && info.bases?.head && <option value="head">Your checkout's current commit ({short(info.bases.head.commit)}{info.bases.head.branch ? `, ${info.bases.head.branch}` : ', detached'})</option>}
+        </select>
+        <p className="text-[12px] leading-snug text-quiet">Your working tree, index, and current branch are not touched.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-primary !px-4 !py-2 !text-[14px]" disabled={!idle} onClick={() => void send('branch')}>
+          {working === 'branch' ? <Loader2 size={14} className="animate-spin" /> : null} Create branch
+        </button>
+        <button type="button" className="btn-secondary !px-4 !py-2 !text-[14px]" disabled={!idle} onClick={() => void send('export')}>
+          {working === 'export' ? <Loader2 size={14} className="animate-spin" /> : null} Export patch
+        </button>
+      </div>
+      {blocked && <p className="text-[12px] leading-snug text-quiet">Keep or undo the change in progress before delivering.</p>}
+      <div aria-live="polite" className="space-y-2 text-[13px] leading-snug">
+        {error && <p role="alert" className="text-red-700">{error}</p>}
+        {delivery?.branch && (
+          <p>
+            Created <span className="font-mono">{delivery.branch.name}</span> with {delivery.branch.commits} {delivery.branch.commits === 1 ? 'commit' : 'commits'} on {short(delivery.branch.root.commit)}.
+            {delivery.branch.name !== delivery.branch.requested ? ` ${delivery.branch.requested} was taken.` : ''}
+            {delivery.branch.stale ? ' Steps were kept after this branch was made. Create it again to include them.' : ''}
+          </p>
+        )}
+        {delivery?.exports.map((file) => (
+          <p key={file.name}><a className="underline" href={`/api/editor/${path}/exports/${file.name}`} download={file.name}>Download {file.name}</a> <span className="text-quiet">({Math.ceil(file.bytes / 1024)} KB)</span></p>
+        ))}
+        {delivery?.pr && <p>{delivery.pr.reused ? 'Pull request already open: ' : 'Opened '}<a className="underline" href={delivery.pr.url} target="_blank" rel="noreferrer">{delivery.pr.url}</a></p>}
+      </div>
+      {delivery?.branch && !delivery.pr && info?.github === 'ready' && (
+        <div className="space-y-1">
+          <button type="button" className="btn-secondary !px-4 !py-2 !text-[14px]" disabled={!idle || delivery.branch.stale} onClick={() => void send('pr')}>
+            {working === 'pr' ? <Loader2 size={14} className="animate-spin" /> : null} Open pull request
+          </button>
+          <p className="text-[12px] leading-snug text-quiet">Pushes {delivery.branch.name} to origin, then asks GitHub to open a pull request.</p>
+        </div>
+      )}
     </section>
   );
 }
