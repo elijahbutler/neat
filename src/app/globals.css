@@ -147,3 +147,7 @@
     background-size: 14px 14px;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin { animation: none; }
+}

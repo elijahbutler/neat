@@ -28,6 +28,8 @@ export interface RepoIndex {
   components: ComponentCard[];
   /** Component, page, or layout ID to the IDs of project components it renders. */
   renders: Record<string, string[]>;
+  /** Component IDs rendered by a map or loop, where one call site can produce several instances. */
+  repeated: string[];
   profile: DesignSystemProfile;
 }
 
@@ -119,7 +121,26 @@ export function buildRepoIndex(profile: DesignSystemProfile, project: Project, r
       example: usage?.sites[0],
     };
   });
-  return { commit: profile.commit, routes: routes.sort((a, b) => a.pattern.localeCompare(b.pattern)), components, renders, profile };
+  const repeated = new Set<string>();
+  const byLocation = new Map(profile.components.map(c => [idOf(c), c]));
+  const byName = new Map<string, ComponentInfo[]>();
+  for (const component of profile.components) byName.set(component.name, [...(byName.get(component.name) ?? []), component]);
+  for (const sf of project.getSourceFiles()) {
+    if (!projectPath(root, sf.getFilePath())) continue;
+    for (const el of [...sf.getDescendantsOfKind(SyntaxKind.JsxOpeningElement), ...sf.getDescendantsOfKind(SyntaxKind.JsxSelfClosingElement)]) {
+      const loop = el.getFirstAncestor(node => {
+        if (Node.isForStatement(node) || Node.isForOfStatement(node) || Node.isForInStatement(node)) return true;
+        if (!Node.isCallExpression(node)) return false;
+        const expression = node.getExpression();
+        return Node.isPropertyAccessExpression(expression) && ['map', 'flatMap'].includes(expression.getName());
+      });
+      if (loop) {
+        const component = resolveComponentTag(el.getTagNameNode(), root, byLocation, byName);
+        if (component) repeated.add(idOf(component));
+      }
+    }
+  }
+  return { commit: profile.commit, routes: routes.sort((a, b) => a.pattern.localeCompare(b.pattern)), components, renders, repeated: [...repeated].sort(), profile };
 }
 
 /** Match a URL pathname to a Next App Router page, including dynamic and catch-all segments. */

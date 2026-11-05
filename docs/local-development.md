@@ -1,20 +1,26 @@
 # Local development
 
-Install Node.js 22.12 or newer, Bun, and Git on macOS or Linux. From the repository root:
+Install Node.js 22.12 or newer, Bun, and Git. From the repository root:
 
 ```sh
 bun install
 bun run fixtures:install
 bun run check
-bun bin/neat.ts open fixtures/orbit-studio --port 4400
+NEAT_HOME=/tmp/neat-dev bun bin/neat.ts open fixtures/orbit-studio --port 4400
 ```
 
-Open the printed URL, create a session, and open the preview. Select an element to inspect its source and edit text or token-backed properties. Direct edits need no key. Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before launch to use Ask.
+Open the printed URL. Select a heading, double-click to edit its text, and keep the change. Change a property and keep it too. The timeline shows each diff and the checks that ran. Undo a step to exercise revision checks and dependency conflicts.
 
-The worker bundles the editor client with Bun and processes its CSS with Tailwind. It serves the UI and API on one loopback port. The preview runs separately in a temporary worktree. Ctrl+C stops the preview and removes that worktree. Pass state is currently in memory; branch and patch export remain planned.
+Stop the worker with Ctrl+C, then repeat the same command and `NEAT_HOME` value. The kept steps return in a fresh worktree. Browser reloads preserve the active session, including a pending change or confirmation. Worker restarts recover only kept steps.
 
-Use `bun run typecheck` for a focused type check and `bun test path/to/file.test.ts` for focused tests. The full check needs fixture dependencies. Docker integration tests are optional and run with `bun run test:docker` after building the image described in the [README](../README.md).
+Use Create branch or Export patch to deliver the pass. A branch is built through a separate temporary worktree and never checks out in the original repository. The explicit Open pull request action can push, so use a local test repository without a remote when testing delivery without publishing.
 
-The convenience command `bun run editor` opens the same local editor against orbit-studio by default. To inspect extracted data without starting a server, run `bun bin/neat.ts extract fixtures/orbit-studio`.
+Direct edits need no key. Ask uses `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` from the launch environment. Tests use a scripted client and temporary Git repositories, with no network. Keep real keys outside version control.
 
-The optional public component catalogue is configured with `NEAT_LIBRARY_URL`. Without it, the library panel lists the repository's own components and reports the external catalogue as unavailable. The [roadmap](../ROADMAP.md) describes upcoming work.
+The worker bundles `src/app/editor/standalone.tsx`, processes the editor CSS, and serves the UI and API together. The preview runs on another loopback port. Stop verification workers when finished; the provider stops their Next processes and removes their session worktrees. Delete the chosen temporary `NEAT_HOME` only after saving any passes you need.
+
+Run `bun run typecheck` and focused `bun test path/to/file.test.ts` checks while editing. Before publishing, run `bun run check`. Docker tests are optional with `bun run test:docker`, and Docker is outside the durable delivery workflow.
+
+`bun run editor` opens orbit-studio through the same worker. `bun bin/neat.ts extract fixtures/orbit-studio` inspects extracted data without starting a server. The optional public catalogue uses `NEAT_LIBRARY_URL`; otherwise the library panel lists local components and reports the external catalogue as unavailable.
+
+See [verification](verification.md) for the acceptance scope, [product intent](../PRODUCT.md), [design](../DESIGN.md), and the [roadmap](../ROADMAP.md).

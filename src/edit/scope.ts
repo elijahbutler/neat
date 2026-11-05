@@ -84,7 +84,7 @@ export function isShared(index: RepoIndex, card: ComponentCard): boolean {
     if (seen.has(id)) continue;
     seen.add(id);
     const current = index.components.find(c => c.id === id);
-    if ((current?.uses ?? 0) > 1 || index.routes.filter(route => route.components.includes(id)).length > 1) return true;
+    if (index.repeated.includes(id) || (current?.uses ?? 0) > 1 || index.routes.filter(route => route.components.includes(id)).length > 1) return true;
     for (const [owner, rendered] of Object.entries(index.renders)) {
       if (rendered.includes(id)) queue.push(owner);
     }

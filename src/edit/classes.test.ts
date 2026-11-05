@@ -229,7 +229,8 @@ describe('from a control to the source', () => {
   });
 
   test('keeps state classes and applies several steps to one string', () => {
-    expect(orbit.set('components/ProjectCard.tsx:8:5', 'padding', '8')).toEqual(['<Link href={`/work/${project.slug}`} className="group block rounded-card border border-rule p-8 transition-colors hover:border-ink">']);
+    expect(() => orbit.set('components/ProjectCard.tsx:8:5', 'padding', '8')).toThrow('Confirm it to go ahead');
+    expect(orbit.set('components/ProjectCard.tsx:8:5', 'padding', '8', ['components/ProjectCard.tsx'])).toEqual(['<Link href={`/work/${project.slug}`} className="group block rounded-card border border-rule p-8 transition-colors hover:border-ink">']);
     expect(messy.set('app/page.tsx:21:9', 'padding', '3')).toEqual(['<button className="bg-[#0a7d5a] text-white rounded p-3">Shop mugs</button>']);
   });
 

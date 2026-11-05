@@ -30,6 +30,7 @@ interface Session {
   fixture: string;
   state: 'starting' | 'ready' | 'stopped' | 'failed';
   previewUrl: string;
+  pass?: { id: string; base: string; durable: boolean };
   pending: { kind: 'ask' | 'direct'; instruction: string; changes: FileChange[]; checks: Check[] } | null;
   timeline: Step[];
   /** A shared-component change waiting for the person to confirm or cancel it. */
@@ -236,15 +237,15 @@ export function EditorApp() {
   useEffect(() => { post({ type: 'neat:mode', selecting }); }, [selecting, post]);
 
   async function start() {
-    setError(null); setLogs(null); setTarget(null); setInspection(null); setNotice(null); setRecoveryShown(true);
-    try { setSession(await api<Session>('sessions', { body: { fixture } })); }
+    setError(null); setLogs(null); setTarget(null); setInspection(null); setNotice(null); setRecoveryShown(true); setProposal(null); setProposalError(null); setConfirming(false); setAskError(null);
+    try { const opened = await api<Session>('sessions', { body: { fixture } }); setSession(opened); setProposal(opened.proposal); }
     catch (e) { setError((e as Error).message); }
   }
 
   async function stop() {
     if (!session) return;
     await api(`sessions/${session.id}`, { method: 'DELETE' }).catch(() => undefined);
-    setSession(null); setTarget(null); setInspection(null);
+    setSession(null); setTarget(null); setInspection(null); setProposal(null); setProposalError(null); setConfirming(false); setAskError(null);
   }
 
   async function ask(e: FormEvent) {
@@ -341,14 +342,14 @@ export function EditorApp() {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-page text-ink">
-      <header className="flex h-12 shrink-0 items-center gap-4 border-b border-ink px-4">
+      <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-ink px-4 py-2 lg:h-12 lg:flex-nowrap lg:gap-4 lg:py-0">
         <span className="display text-[22px] leading-none">Neat Labs</span>
-        <span className="caption text-quiet">Editor · local</span>
+        <span className="caption hidden text-quiet sm:inline">Editor · local</span>
         {session && (
           <>
-            <span className="caption rounded-full border border-ink px-2.5">{session.fixture}</span>
+            <span className="caption max-w-40 truncate rounded-full border border-ink px-2.5" title={session.fixture}>{session.fixture.split(/[/\\]/).filter(Boolean).at(-1)}</span>
             <form
-              className="flex min-w-0 flex-1 items-center"
+              className="order-last flex min-w-0 flex-1 basis-full items-center lg:order-none lg:basis-auto"
               onSubmit={(e) => { e.preventDefault(); if (frame.current) frame.current.src = new URL(route, session.previewUrl).toString(); }}
             >
               <label htmlFor="route" className="sr-only">Page</label>
@@ -391,8 +392,8 @@ export function EditorApp() {
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1">
-          <div className="grid-canvas relative flex min-w-0 flex-1 justify-center overflow-auto p-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
+          <div className="grid-canvas relative flex h-[55svh] min-w-0 shrink-0 justify-center overflow-auto p-4 lg:h-auto lg:flex-1">
             {session.state === 'ready' ? (
               <iframe
                 ref={frame}
@@ -416,9 +417,10 @@ export function EditorApp() {
             )}
           </div>
 
-          <aside className="flex w-[380px] shrink-0 flex-col border-l border-ink" aria-label="Inspector">
+          <aside className="flex w-full shrink-0 flex-col border-t border-ink lg:w-[380px] lg:border-t-0 lg:border-l" aria-label="Inspector">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
               {session.recovery && recoveryShown && <RecoveryNotice recovery={session.recovery} onDismiss={() => setRecoveryShown(false)} />}
+              {session.pass && !session.pass.durable && <p role="status" className="text-[13px] text-quiet">This preview keeps edits for this session only. Use the default local preview to save passes and deliver branches.</p>}
               {notice && <p role="status" className="rounded-[6px] border border-rule bg-wash p-3 text-[13px] leading-snug">{notice}</p>}
               {session.pending ? (
                 <PendingChange session={session} onSettle={settle} />
@@ -429,7 +431,7 @@ export function EditorApp() {
               ) : (
                 <p className="text-[15px] text-quiet">{session.state === 'ready' ? 'Click anything on the page to see which component and line it comes from. Double-click text to edit it.' : 'The inspector fills in once the preview is running.'}</p>
               )}
-              {session.timeline.some((step) => step.status === 'kept') && (
+              {session.pass?.durable && session.timeline.some((step) => step.status === 'kept') && (
                 <DeliveryPanel session={session} blocked={!!session.pending || !!proposal || confirming || undoing !== null} onDelivery={(delivery) => setSession((current) => (current ? { ...current, delivery } : current))} />
               )}
               {session.timeline.length > 0 && <Timeline steps={session.timeline} busy={undoing !== null || !!session.pending || !!proposal || confirming} undoing={undoing} onUndo={undoStep} />}

@@ -2,6 +2,7 @@ import { realpath, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
+import { resolveNextVersion } from '../tagging/inject';
 
 export function parseOpenArgs(args: string[]) {
   const repo = args[0];
@@ -28,7 +29,7 @@ export async function validateNextApp(repo: string, app = '.') {
   const pkg = packageSchema.parse(JSON.parse(await readFile(join(target, 'package.json'), 'utf8')));
   const next = pkg.dependencies?.next ?? pkg.devDependencies?.next;
   if (!next || !['app', 'src/app'].some(dir => existsSync(join(target, dir)))) throw new Error('Neat requires a Next.js 14, 15, or 16 App Router app with app/ or src/app/.');
-  const version = /(?:^|[^0-9])(14|15|16)\./.exec(next);
-  if (!version) throw new Error(`Unsupported Next.js version ${next}. Neat supports Next.js 14 to 16 App Router.`);
+  const installed = await resolveNextVersion(target);
+  if (!/^(14|15|16)\./.test(installed)) throw new Error('Neat supports installed Next.js versions 14 to 16 App Router.');
   return root;
 }

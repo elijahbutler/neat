@@ -442,6 +442,7 @@ async function planPass(fresh: boolean) {
 
 /** Everything a delivery needs from the session, or the reason it cannot go ahead. */
 function deliverySource(s: Session, h: History) {
+  if (!provider.durable) throw new DeliveryError('DELIVERY_UNAVAILABLE');
   if (s.pending) throw new DeliveryError('PENDING_CHANGE');
   if (s.proposals.peek()) throw new DeliveryError('PENDING_PROPOSAL');
   const expectedCommits: string[] = [];

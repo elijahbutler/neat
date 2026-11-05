@@ -232,7 +232,10 @@ describe('selection scope', () => {
 
   test('a selection inside a component definition is held to its own subtree', () => {
     const title = { selection: 'components/ProjectCard.tsx:10:7' };
-    expect(orbit.run([{ op: 'replace-class', target: 'components/ProjectCard.tsx:10:7', from: 'mt-2', to: 'mt-3' }], title).result.errors).toEqual([]);
+    const operation = { op: 'replace-class' as const, target: title.selection, from: 'mt-2', to: 'mt-3' };
+    expect(codes([operation], title)).toEqual(['needs-confirmation']);
+    const confirmed = { ...title, allow: ['components/ProjectCard.tsx'] };
+    expect(orbit.run([operation], confirmed).result.errors).toEqual([]);
     expect(codes([{ op: 'replace-class', target: 'components/ProjectCard.tsx:9:7', from: 'text-sm', to: 'text-xs' }], title)).toEqual(['out-of-scope']);
   });
 

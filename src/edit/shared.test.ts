@@ -90,3 +90,28 @@ test('a definition rendered once by a repeated wrapper still needs confirmation'
   if (result.ok) throw new Error('Expected confirmation');
   expect(result.confirm.map(c => c.component)).toEqual(['Badge']);
 });
+
+test('a component rendered by map needs confirmation despite having one call site', async () => {
+  const { project, index } = await load({
+    'components/Badge.tsx': BADGE,
+    'app/page.tsx': "import { Badge } from '../components/Badge'; export default function Page() { return <main>{['a','b'].map(x => <Badge key={x}>{x}</Badge>)}</main>; }\n",
+  });
+  const tag = 'components/Badge.tsx:3:10';
+  const result = directEdit(project, temp, index, { tag, operations: [{ op: 'replace-class', target: tag, from: 'text-sm', to: 'text-lg' }] });
+  expect(result.ok).toBe(false);
+  if (result.ok) throw new Error('Expected confirmation');
+  expect(result.confirm.map(c => c.component)).toEqual(['Badge']);
+});
+
+test('type checks include consumers reached through another component', async () => {
+  const { project, index } = await load({
+    'components/Badge.tsx': BADGE,
+    'components/Wrapper.tsx': "import { Badge, kind } from './Badge'; export const retained = kind; export function Wrapper() { return <Badge>Wrapper</Badge>; }\n",
+    'app/page.tsx': "import { Wrapper, retained } from '../components/Wrapper'; const value: 'a' = retained; export default function Page() { return <main><Wrapper /></main>; }\n",
+  });
+  const change = { file: 'components/Badge.tsx', before: BADGE, after: BADGE.replace("= 'a'", "= 'b'") };
+  const result = checkEdit(project, temp, index, [change]);
+  expect(result.ok).toBe(false);
+  expect(result.errors.map(e => [e.check, e.file])).toContainEqual(['typecheck', 'app/page.tsx']);
+  expect(consumerFiles(index, ['components/Badge.tsx'])).toEqual(['app/page.tsx', 'components/Wrapper.tsx']);
+});
