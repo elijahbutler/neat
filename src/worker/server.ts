@@ -3,24 +3,27 @@ import { createEditClient, resolveEditModel, MODEL_SETUP_NOTE } from '../edit/mo
 import { buildShell } from './shell';
 import { allocatePort, createWorktreeProvider, reclaimSessions } from '../sandbox/worktree';
 import type { SandboxProvider } from '../sandbox/docker';
-import { $ } from 'bun';
 import { randomBytes } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { realpath } from 'node:fs/promises';
 import { Node, type Project } from 'ts-morph';
 import { createCatalogueClient, type CatalogueReference } from '../catalogue/client';
 import { buildLibrary } from '../catalogue/library';
 import { proposeEdit } from '../edit/agent';
 import { panelOptions } from '../edit/classes';
-import { directEdit } from '../edit/direct';
+import { checkEdit } from '../edit/check';
+import { directEdit, type CheckStatus } from '../edit/direct';
 import { buildRepoIndex, findJsxAt, loadEditProject, resolveSelection, type RepoIndex } from '../edit/index';
 import type { FileChange } from '../edit/operations';
+import { invertSpans, relocateTag, tagFile, type FileSpan } from '../edit/shift';
 import { styleSource } from '../edit/properties';
 import { textSource } from '../edit/text';
 import { extractDesignSystem } from '../extract/profile';
 import { projectPath } from '../extract/project';
 import { dockerProvider, type SandboxInfo, type SandboxState } from '../sandbox/docker';
+import { commitExists, git, gitText, openWorktree, readApp, Refusal, requireState, writeApp } from './git';
+import { chainHeads, entriesBefore, keepStep, replayPass, timeline, undoStep, type History } from './history';
 import { exclusive, SessionBusyError, type Lockable } from './lock';
+import { createPass, latestOpenPass, loadPasses, sha256, writePass, type Pass } from './passes';
 
 export interface WorkerOptions { repo: string; app?: string; port?: number; docker?: boolean }
 export function createWorker(options: WorkerOptions & { origin: string; shell: Map<string, { body: string | Blob; type: string }>; provider: SandboxProvider }) {
@@ -30,7 +33,19 @@ const config = resolveEditModel();
 const MODEL = config?.model ?? 'No model configured';
 const FIXTURES = [options.repo];
 /** `direct` changes come from a control in the editor, `ask` changes from the model. Both wait for Keep or Undo. */
-interface Pending { kind: 'ask' | 'direct'; instruction: string; tag: string; changes: FileChange[]; reference?: CatalogueReference }
+interface Pending {
+  kind: 'ask' | 'direct'; instruction: string; tag: string; changes: FileChange[]; reference?: CatalogueReference;
+  spans: FileSpan[]; checks: CheckStatus[];
+}
+/** What a restart found. Shown to the person so a pass that came back short is never silent. */
+interface Recovery {
+  /** Steps put back. */
+  restored: number;
+  /** Saved pass files that could not be read. */
+  skipped: number;
+  /** The first step that could not be put back, with a reason code, or why a saved pass was not resumed at all. */
+  failure: { summary: string; reason: Refusal['code'] | 'base-missing' } | null;
+}
 interface Session extends Lockable {
   id: string;
   fixture: string;
@@ -39,11 +54,13 @@ interface Session extends Lockable {
   project?: Project;
   index?: RepoIndex;
   pending?: Pending;
-  history: Array<{ instruction: string; files: string[]; commit: string }>;
+  /** The pass and the worktree it lives in. Set at start for durable providers and on first use otherwise. */
+  history?: History;
+  recovery?: Recovery;
 }
 
 const sessions = new Map<string, Session>();
-let starting: Promise<SandboxInfo> | undefined;
+let starting: Promise<Session> | undefined;
 let closing = false;
 const catalogue = createCatalogueClient();
 const client = config ? createEditClient(config) : null;
@@ -55,9 +72,11 @@ function view(s: Session) {
   return {
     id: s.id, fixture: s.fixture, state: s.state, previewUrl: s.info.previewUrl,
     pending: s.pending
-      ? { kind: s.pending.kind, instruction: s.pending.instruction, changes: s.pending.changes, reference: s.pending.reference && { id: s.pending.reference.id, revision: s.pending.reference.revision, catalogueVersion: s.pending.reference.catalogueVersion } }
+      ? { kind: s.pending.kind, instruction: s.pending.instruction, changes: s.pending.changes, checks: s.pending.checks, reference: s.pending.reference && { id: s.pending.reference.id, revision: s.pending.reference.revision, catalogueVersion: s.pending.reference.catalogueVersion } }
       : null,
-    history: s.history,
+    timeline: s.history ? timeline(s.history) : [],
+    pass: s.history && { id: s.history.pass.id, base: s.history.pass.baseCommit.slice(0, 7), durable: provider.durable === true },
+    recovery: s.recovery ?? null,
   };
 }
 
@@ -72,12 +91,59 @@ function sourceFile(s: Session, file: string) {
   return s.project!.getSourceFiles().find((sf) => projectPath(s.info.dir, sf.getFilePath()) === file);
 }
 
-async function writeChanges(s: Session, changes: FileChange[], which: 'before' | 'after') {
-  for (const change of changes) {
-    await writeFile(join(s.info.dir, change.file), change[which]);
-    sourceFile(s, change.file)?.replaceWithText(change[which]);
-  }
+async function ensureHistory(s: Session): Promise<History> {
+  if (s.history) return s.history;
+  // A provider that can't rebuild a pass still keeps steps for the session, in memory.
+  const wt = await openWorktree(s.info.dir);
+  const pass = createPass({ repo: options.repo, app: options.app ?? '.', baseCommit: (await gitText(wt.root, ['rev-parse', 'HEAD'])).trim() });
+  s.history = { wt, pass, commits: new Map(), persist: async () => {} };
+  return s.history;
+}
+
+function forgetProject(s: Session) { s.project = undefined; s.index = undefined; }
+
+/** Files changed behind the editor's back make the loaded project stale. Read the code again before computing an edit. */
+async function syncProject(s: Session, h: History) {
+  const status = await git(h.wt.root, ['status', '--porcelain', '-uno', '-z']);
+  if (status.code !== 0 || status.out) forgetProject(s);
+}
+
+/** Put the change's `after` text on disk. Refused unless the files are exactly what the change was computed from. */
+async function applyChanges(s: Session, h: History, changes: FileChange[]) {
+  const heads = chainHeads(h.pass);
+  try {
+    await requireState(h.wt, changes.map((c) => ({ file: c.file, hash: sha256(c.before) })));
+    const stale = changes.find((c) => heads.has(c.file) && heads.get(c.file) !== sha256(c.before));
+    if (stale) throw new Refusal(409, 'changed', `${stale.file} differs from the last kept step. Restart the editor to rebuild it from your kept steps.`);
+    await writeApp(h.wt, changes.map((c) => ({ file: c.file, text: c.after })));
+  } catch (error) { forgetProject(s); throw error; }
+  for (const c of changes) sourceFile(s, c.file)?.replaceWithText(c.after);
   refresh(s);
+}
+
+/** Put the pending change back. Refused when a file no longer holds what the change wrote. */
+async function revertPending(s: Session, h: History, pending: Pending) {
+  try {
+    await requireState(h.wt, pending.changes.map((c) => ({ file: c.file, hash: sha256(c.after) })), false);
+    await writeApp(h.wt, pending.changes.map((c) => ({ file: c.file, text: c.before })));
+  } catch (error) { forgetProject(s); throw error; }
+  for (const c of pending.changes) sourceFile(s, c.file)?.replaceWithText(c.before);
+  refresh(s);
+}
+
+/** Where each tag the editor holds points once these spans are applied, or null where that can't be shown. */
+function moveTags(tags: string[], changes: FileChange[], spans: FileSpan[], direction: 'forward' | 'inverse'): Record<string, string | null> {
+  const moved: Record<string, string | null> = {};
+  for (const tag of tags) {
+    const file = tagFile(tag);
+    const change = changes.find((c) => c.file === file);
+    if (!change) { moved[tag] = tag; continue; }
+    const own = spans.filter((span) => span.file === file);
+    moved[tag] = direction === 'forward'
+      ? relocateTag(tag, change.before, change.after, own)
+      : relocateTag(tag, change.after, change.before, invertSpans(own));
+  }
+  return moved;
 }
 
 interface Ancestor { src: string | null; inst: string | null; childIndex: number }
@@ -153,19 +219,24 @@ function editableText(s: Session, tag: string, ancestors: Ancestor[]) {
 
 const strings = (value: unknown) => (Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []);
 
+const tagList = (body: Record<string, unknown>) => [...new Set([typeof body.tag === 'string' ? body.tag : '', ...strings(body.tags)].filter((tag) => tag && tag.length <= 1000))].slice(0, 64);
+const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim();
+
 /** Ask, direct edits, keep, and undo, run one at a time per session. */
 async function change(s: Session, action: 'ask' | 'edit' | 'keep' | 'undo', body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
+  const h = await ensureHistory(s);
   if (action === 'edit') {
     // The direct-edit path: operations from a control, applied with the same scope and checks as an Ask, no model.
     if (s.pending) return fail(409, 'Keep or undo the last change first.');
     const tag = String(body.tag ?? '');
+    await syncProject(s, h);
     // Load the project before reading it: an edit can be the first request a session gets, ahead of any inspect.
     const index = s.index ?? refresh(s);
     const result = directEdit(s.project!, s.info.dir, index, { tag, operations: body.operations, allow: strings(body.allow), label: typeof body.label === 'string' ? body.label : undefined });
     if (!result.ok) return json(result, 422);
-    await writeChanges(s, result.changes, 'after');
-    s.pending = { kind: 'direct', instruction: result.summary, tag, changes: result.changes };
-    return json({ ok: true, session: view(s) });
+    await applyChanges(s, h, result.changes);
+    s.pending = { kind: 'direct', instruction: result.summary, tag, changes: result.changes, spans: result.spans, checks: result.checks };
+    return json({ ok: true, session: view(s), nextTag: result.nextTag, moved: moveTags(tagList(body), result.changes, result.spans, 'forward') });
   }
   if (action === 'ask') {
     if (!client) return fail(503, MODEL_SETUP_NOTE);
@@ -181,27 +252,90 @@ async function change(s: Session, action: 'ask' | 'edit' | 'keep' | 'undo', body
       if (!resolved.ok) return fail(resolved.status, 'Catalogue reference unavailable.');
       reference = resolved.reference;
     }
+    // The model call is slow. Start from the code as it is on disk now, and check again before writing the result.
+    await syncProject(s, h);
     const index = s.index ?? refresh(s);
     // The selection is the scope. `allow` carries wider targets the person confirmed after a needs-confirmation reply.
     const allow = strings(body.allow);
     const outcome = await proposeEdit({ signal, client, model: MODEL, project: s.project!, root: s.info.dir, index, route: String(body.route ?? '/'), tag: String(body.tag ?? ''), instruction, reference, allow });
     if (!outcome.changes) return json({ ok: false, attempts: outcome.attempts, errors: outcome.errors, confirm: outcome.confirm }, 422);
-    await writeChanges(s, outcome.changes, 'after');
-    s.pending = { kind: 'ask', instruction, tag: String(body.tag), changes: outcome.changes, reference };
-    return json({ ok: true, attempts: outcome.attempts, usage: outcome.usage, session: view(s) });
+    const changes = outcome.changes.filter((c) => c.before !== c.after);
+    if (!changes.length) return json({ ok: false, attempts: outcome.attempts, errors: ['Nothing changed. The code already says that.'], confirm: [] }, 422);
+    await applyChanges(s, h, changes);
+    s.pending = { kind: 'ask', instruction, tag: String(body.tag), changes, reference, spans: outcome.spans, checks: outcome.checks };
+    return json({ ok: true, attempts: outcome.attempts, usage: outcome.usage, session: view(s), nextTag: outcome.nextTag, moved: moveTags(tagList(body), changes, outcome.spans, 'forward') });
+  }
+  const tags = tagList(body);
+  if (action === 'keep') {
+    if (!s.pending) return fail(409, 'There is no change waiting to be kept or undone.');
+    const pending = s.pending;
+    await keepStep(h, { source: pending.kind, summary: oneLine(pending.instruction), tag: pending.tag, changes: pending.changes, spans: pending.spans, checks: pending.checks });
+    s.pending = undefined;
+    return json({ ...view(s), nextTag: typeof body.tag === 'string' ? body.tag : null, moved: Object.fromEntries(tags.map((tag) => [tag, tag])) });
+  }
+  if (typeof body.step === 'string') {
+    // Take one kept step back. The newest vanishes from the history; an earlier one is reversed by a new step.
+    if (s.pending) return fail(409, 'Keep or undo the last change first.');
+    await syncProject(s, h);
+    const result = await undoStep(h, body.step, {
+      check: (changes) => {
+        // Read the code again so the check sees exactly what is on disk.
+        forgetProject(s);
+        const index = refresh(s);
+        const found = checkEdit(s.project!, s.info.dir, index, changes);
+        return found.ok ? null : `Undoing this step would break the code in ${[...new Set(found.errors.map((e) => e.file))].join(', ')}. Undo the steps that depend on it first.`;
+      },
+    }).catch((error: unknown) => { forgetProject(s); throw error; });
+    forgetProject(s);
+    const dropped = result.mode === 'dropped';
+    // Only the newest step leaves the files exactly as it found them, so only then can a tag be followed back across it.
+    const moved = dropped
+      ? moveTags(tags, result.changes.map((c) => ({ file: c.file, before: c.after, after: c.before })), result.entry.spans, 'inverse')
+      : Object.fromEntries(tags.map((tag) => [tag, null]));
+    return json({ ...view(s), nextTag: typeof body.tag === 'string' ? moved[body.tag] ?? null : null, moved });
   }
   if (!s.pending) return fail(409, 'There is no change waiting to be kept or undone.');
-  if (action === 'keep') {
-    const files = s.pending.changes.map((c) => c.file);
-    await $`git add -- ${files}`.cwd(s.info.dir).quiet();
-    await $`git -c user.name=Neat -c user.email=sandbox@neatlabs.design commit -q -m ${s.pending.instruction}`.cwd(s.info.dir).quiet();
-    const commit = (await $`git rev-parse --short HEAD`.cwd(s.info.dir).quiet().text()).trim();
-    s.history.push({ instruction: s.pending.instruction, files, commit });
-  } else {
-    await writeChanges(s, s.pending.changes, 'before');
-  }
+  const pending = s.pending;
+  await revertPending(s, h, pending);
   s.pending = undefined;
-  return json(view(s));
+  const moved = moveTags(tags, pending.changes, pending.spans, 'inverse');
+  return json({ ...view(s), nextTag: typeof body.tag === 'string' ? moved[body.tag] ?? null : null, moved });
+}
+
+
+/**
+ * Decide which pass a new session continues, before its worktree exists: the latest open one saved for this repository
+ * and app, rebuilt at its base commit, or a new one at the repository's HEAD. A pass is written to disk when its first
+ * step is kept, so opening and closing the editor never replaces a saved pass with an empty one.
+ */
+async function planPass(fresh: boolean) {
+  const repo = await realpath(options.repo);
+  const app = options.app ?? '.';
+  const loaded = await loadPasses(repo);
+  let resume = fresh ? undefined : latestOpenPass(loaded.passes, app);
+  let baseMissing: Pass | undefined;
+  if (resume && !(await commitExists(repo, resume.baseCommit))) { baseMissing = resume; resume = undefined; }
+  const pass = resume ?? createPass({ repo, app, baseCommit: (await gitText(repo, ['rev-parse', 'HEAD'])).trim() });
+  let history: History | undefined;
+  let replay: Awaited<ReturnType<typeof replayPass>> | undefined;
+  const persist = () => writePass(history!.pass);
+  return {
+    baseCommit: pass.baseCommit,
+    restore: async (dirs: { root: string; appDir: string }) => {
+      history = { wt: await openWorktree(dirs.appDir), pass, commits: new Map(), persist };
+      if (resume) replay = await replayPass(history);
+    },
+    async finish(s: Session) {
+      history ??= { wt: await openWorktree(s.info.dir), pass, commits: new Map(), persist };
+      s.history = history;
+      s.recovery = resume || loaded.skipped || baseMissing ? { restored: replay?.applied ?? 0, skipped: loaded.skipped, failure: baseMissing ? { summary: 'A saved pass', reason: 'base-missing' } : null } : undefined;
+      if (replay?.failure && resume) {
+        // Keep what came back and carry on in a new pass. The saved one stays on disk untouched.
+        history.pass = { ...createPass({ repo, app, baseCommit: resume.baseCommit, supersedes: resume.id }), entries: entriesBefore(resume, replay.failure.entry) };
+        s.recovery = { restored: replay.applied, skipped: loaded.skipped, failure: { summary: replay.failure.entry.summary, reason: replay.failure.reason } };
+      }
+    },
+  };
 }
 
 async function handle(req: Request): Promise<Response> {
@@ -225,11 +359,17 @@ async function handle(req: Request): Promise<Response> {
     if (sessions.size) return json(view([...sessions.values()][0]!));
     if (closing) return fail(503, 'Editor is shutting down.');
     if (starting) return fail(409, 'A preview is already starting.');
-    starting = provider.start(id, options.repo, { editorOrigin: EDITOR_ORIGIN });
-    let info: SandboxInfo;
-    try { info = await starting; } finally { starting = undefined; }
-    const session: Session = { id, fixture, info, state: 'starting', history: [] };
-    sessions.set(id, session);
+    // Registered synchronously, so a second request or a shutdown sees the start in progress.
+    starting = (async () => {
+      const plan = provider.durable ? await planPass(body.fresh === true) : null;
+      const info = await provider.start(id, options.repo, { editorOrigin: EDITOR_ORIGIN, baseCommit: plan?.baseCommit, restore: plan?.restore });
+      const created: Session = { id, fixture, info, state: 'starting' };
+      try { await plan?.finish(created); } catch (error) { await provider.stop(info).catch(() => undefined); throw error; }
+      sessions.set(id, created);
+      return created;
+    })();
+    let session: Session;
+    try { session = await starting; } finally { starting = undefined; }
     return json(view(session), 201);
   }
 
@@ -276,6 +416,7 @@ async function handle(req: Request): Promise<Response> {
       return await exclusive(s, () => change(s, action, body, req.signal));
     } catch (error) {
       if (error instanceof SessionBusyError) return fail(409, error.message);
+      if (error instanceof Refusal) return json({ error: error.message, code: error.code.toUpperCase() }, error.status);
       throw error;
     }
   }

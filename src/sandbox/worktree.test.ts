@@ -232,3 +232,24 @@ test('a pnpm workspace counts as a workspace root without a package.json workspa
     expect(isWorkspaceRoot(root, {})).toBe(true);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('a worktree can start at an earlier commit, and a base that is not a commit hash is refused', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'neat-base-'));
+  const repo = join(temp, 'repo'), session = join(temp, 'session');
+  await mkdir(repo);
+  try {
+    await $`git init -q ${repo}`.quiet();
+    await writeFile(join(repo, 'file'), 'first');
+    await $`git add .`.cwd(repo).quiet();
+    await $`git -c user.name=Test -c user.email=test@example.com commit -qm first`.cwd(repo).quiet();
+    const first = (await $`git rev-parse HEAD`.cwd(repo).quiet().text()).trim();
+    await writeFile(join(repo, 'file'), 'second');
+    await $`git -c user.name=Test -c user.email=test@example.com commit -qam second`.cwd(repo).quiet();
+    await expect(prepareWorktree(repo, session, 'http://127.0.0.1:44317', '.', '--help')).rejects.toThrow('Invalid base commit.');
+    await prepareWorktree(repo, session, 'http://127.0.0.1:44317', '.', first);
+    try {
+      expect(await readFile(join(session, 'file'), 'utf8')).toBe('first');
+      expect((await $`git rev-parse HEAD`.cwd(session).quiet().text()).trim()).toBe(first);
+    } finally { await removeWorktree(session); }
+  } finally { await rm(temp, { recursive: true, force: true }); }
+});

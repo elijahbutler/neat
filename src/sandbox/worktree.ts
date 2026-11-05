@@ -235,11 +235,12 @@ export async function matchingLockfiles(source: string, target: string): Promise
   return true;
 }
 
-export async function prepareWorktree(repo: string, dir: string, editorOrigin: string, app = '.'): Promise<string> {
+export async function prepareWorktree(repo: string, dir: string, editorOrigin: string, app = '.', base = 'HEAD'): Promise<string> {
+  if (base !== 'HEAD' && !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(base)) throw new Error('Invalid base commit.');
   const gitRoot = (await $`git rev-parse --show-toplevel`.cwd(repo).quiet().text()).trim();
   const prefix = relative(gitRoot, repo);
   await mkdir(dirname(dir), { recursive: true });
-  await $`git worktree add --detach ${dir} HEAD`.cwd(repo).quiet();
+  await $`git worktree add --detach ${dir} ${base}`.cwd(repo).quiet();
   const appDir = resolve(dir, prefix, app);
   try {
     const env = await copyEnvFiles(repo, join(dir, prefix));
@@ -268,7 +269,8 @@ export async function removeWorktree(dir: string): Promise<void> {
 
 export function createWorktreeProvider(options: { homeDir?: string; app?: string; webpack?: boolean } = {}): SandboxProvider {
   return {
-    async start(id, repo, { editorOrigin }) {
+    durable: true,
+    async start(id, repo, { editorOrigin, baseCommit, restore }) {
       if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid session id.');
       const home = options.homeDir ?? sessionHome();
       await reclaimSessions(home);
@@ -278,7 +280,7 @@ export function createWorktreeProvider(options: { homeDir?: string; app?: string
       const record: SessionRecord = { id, repo: resolve(repo), dir, appDir: resolve(dir, options.app ?? '.'), marker: `# Neat ${dir}`, owner: { pid: process.pid, start }, preview: null };
       await persistSession(home, record);
       try {
-        const appDir = await prepareWorktree(resolve(repo), dir, editorOrigin, options.app);
+        const appDir = await prepareWorktree(resolve(repo), dir, editorOrigin, options.app, baseCommit);
         record.appDir = appDir;
         await persistSession(home, record);
         const sourceApp = resolve(repo, options.app ?? '.');
@@ -312,6 +314,8 @@ export function createWorktreeProvider(options: { homeDir?: string; app?: string
         const injected = [...tagged.injectedPaths.map(file => join(appDir, file)), join(appDir, 'next-env.d.ts'), join(appDir, 'tsconfig.json')];
         await excludeFiles(dir, injected.map(file => '/' + relative(dir, file).replaceAll('\\', '/')));
         for (const file of injected) await $`git update-index --skip-worktree -- ${relative(dir, file)}`.cwd(dir).quiet().nothrow();
+        // Kept changes go back in after the preview additions are hidden from git and before the first compile.
+        if (restore) await restore({ root: await realpath(dir), appDir: await realpath(appDir) });
         const port = await allocatePort();
         const next = existsSync(join(appDir, 'node_modules', '.bin', 'next')) ? join(appDir, 'node_modules', '.bin', 'next') : join(installRoot, 'node_modules', '.bin', 'next');
         const args = ['dev', ...(options.webpack ? ['--webpack'] : []), '-H', '127.0.0.1', '-p', String(port)];

@@ -94,3 +94,17 @@ test('confirmation also stops retries when another operation is outside the sele
   expect(result.changes).toBeNull();
   expect(script.seen).toHaveLength(1);
 });
+
+test('an accepted edit reports where the selection is afterwards, and what was and was not checked', async () => {
+  // A sibling is inserted before the selection, so the heading moves down one line.
+  const insert: EditOperation[] = [{ op: 'insert-jsx', anchor: 'app/about/page.tsx:9:9', position: 'before', jsx: '<Tag tone="brand">New</Tag>' }];
+  const outcome = await scripted([insert]).ask('app/about/page.tsx:9:9');
+  const text = outcome.changes!.find((c) => c.file === 'app/about/page.tsx')!.after.split('\n');
+  expect(text[9]).toBe('        <h1 className="mt-4 font-display text-5xl">Four people, one studio</h1>');
+  expect(outcome.nextTag).toBe('app/about/page.tsx:10:9');
+  expect(outcome.checks.filter((c) => c.status === 'not-run').map((c) => c.name)).toEqual(['lint', 'render']);
+  expect(outcome.checks.filter((c) => c.status === 'passed').map((c) => c.name)).toEqual(['syntax', 'typecheck', 'imports', 'variants']);
+  // A failed attempt reports nothing to follow.
+  const failed = await scripted([[{ op: 'set-text', target: 'app/page.tsx:18:9', text: 'x' }], [{ op: 'set-text', target: 'app/page.tsx:18:9', text: 'x' }], [{ op: 'set-text', target: 'app/page.tsx:18:9', text: 'x' }]]).ask('app/about/page.tsx:9:9');
+  expect(failed).toMatchObject({ changes: null, nextTag: null, spans: [], checks: [] });
+});

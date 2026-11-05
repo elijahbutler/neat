@@ -6,6 +6,7 @@ import { substituteTokens, tailwindMajor } from '../extract/token-match';
 import { findJsxAt, type ComponentCard, type JsxOpening, type RepoIndex } from './index';
 import { resolveScope, scopeViolation, type EditScope, type ScopeConfirmation } from './scope';
 import { classNameSpread } from './properties';
+import { relocateTag, tagFile, type FileSpan } from './shift';
 import { isLiteralTextChild } from './text';
 
 const tag = z.string().regex(/^.+\.[jt]sx?:\d+:\d+$/, 'a source tag such as app/page.tsx:12:7');
@@ -64,6 +65,13 @@ export interface EditResult {
   errors: EditError[];
   /** Arbitrary values in the model's output that were swapped for matching tokens. */
   substitutions: Array<{ from: string; to: string }>;
+  /** Every replaced range, in the coordinates of each change's `before`. Empty unless every operation applied. */
+  spans: FileSpan[];
+  /**
+   * The scope's selection tag as it reads in the changed files, once lines and columns have moved. The same tag when
+   * nothing before it changed, and null without a scope or when the element's new position can't be shown.
+   */
+  nextTag: string | null;
 }
 
 interface TextEdit {
@@ -214,11 +222,11 @@ function classAttribute(opening: JsxOpening): JsxAttribute | undefined {
 export function applyEdits(project: Project, root: string, index: RepoIndex, input: unknown, scope: EditScope | null): EditResult {
   const parsed = editOperationsSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, changes: [], substitutions: [], errors: parsed.error.issues.map((issue) => ({ op: typeof issue.path[0] === 'number' ? issue.path[0] : -1, code: 'invalid', message: `${issue.path.join('.') || 'request'}: ${issue.message}` })) };
+    return { ok: false, changes: [], substitutions: [], spans: [], nextTag: null, errors: parsed.error.issues.map((issue) => ({ op: typeof issue.path[0] === 'number' ? issue.path[0] : -1, code: 'invalid', message: `${issue.path.join('.') || 'request'}: ${issue.message}` })) };
   }
   const within = scope && resolveScope(project, root, index, scope);
   if (scope && !within) {
-    return { ok: false, changes: [], substitutions: [], errors: [{ op: -1, code: 'target-not-found', message: `The selected element (${scope.selection}) is no longer in the code.` }] };
+    return { ok: false, changes: [], substitutions: [], spans: [], nextTag: null, errors: [{ op: -1, code: 'target-not-found', message: `The selected element (${scope.selection}) is no longer in the code.` }] };
   }
   const tokens = index.profile.tokens;
   const major = tailwindMajor(index.profile.framework.tailwind);
@@ -383,7 +391,7 @@ export function applyEdits(project: Project, root: string, index: RepoIndex, inp
       }
     }
   }
-  if (errors.length) return { ok: false, changes: [], errors, substitutions };
+  if (errors.length) return { ok: false, changes: [], errors, substitutions, spans: [], nextTag: null };
 
   const changes = [...byFile].map(([file, list]) => {
     const before = files.get(file)!.getFullText();
@@ -391,5 +399,13 @@ export function applyEdits(project: Project, root: string, index: RepoIndex, inp
     for (const e of [...list].reverse()) after = after.slice(0, e.start) + e.text + after.slice(e.end);
     return { file, before, after };
   }).sort((a, b) => a.file.localeCompare(b.file));
-  return { ok: true, changes, errors: [], substitutions };
+  const spans = [...byFile].flatMap(([file, list]) => list.map((e) => ({ file, start: e.start, end: e.end, length: e.text.length })))
+    .sort((a, b) => a.file.localeCompare(b.file) || a.start - b.start || a.end - b.end);
+  let nextTag: string | null = null;
+  if (scope) {
+    const file = tagFile(scope.selection);
+    const change = changes.find((c) => c.file === file);
+    nextTag = change ? relocateTag(scope.selection, change.before, change.after, spans.filter((s) => s.file === file)) : scope.selection;
+  }
+  return { ok: true, changes, errors: [], substitutions, spans, nextTag };
 }

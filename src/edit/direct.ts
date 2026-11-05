@@ -1,8 +1,9 @@
 import type { Project } from 'ts-morph';
-import { checkEdit, type CheckError } from './check';
+import { checkEdit, type CheckError, type CheckResult } from './check';
 import type { RepoIndex } from './index';
 import { applyEdits, editOperationsSchema, type EditError, type EditOperation, type FileChange } from './operations';
 import { confirmations, type ScopeConfirmation } from './scope';
+import type { FileSpan } from './shift';
 
 export interface DirectEditRequest {
   /** Source tag of the selected element. It is the scope, exactly as for an Ask. */
@@ -15,8 +16,19 @@ export interface DirectEditRequest {
   label?: string;
 }
 
+/** One check on an applied edit. `not-run` is what the editor could not check yet, never a pass. */
+export interface CheckStatus { name: 'syntax' | 'typecheck' | 'imports' | 'variants' | 'lint' | 'render'; status: 'passed' | 'not-run' }
+
+/** What a clean `checkEdit` result proves: the four code checks passed, and whatever it lists as pending was not run. */
+export function checkStatuses(check: CheckResult): CheckStatus[] {
+  return [
+    ...(['syntax', 'typecheck', 'imports', 'variants'] as const).map((name): CheckStatus => ({ name, status: 'passed' })),
+    ...check.pending.map((name): CheckStatus => ({ name, status: 'not-run' })),
+  ];
+}
+
 export type DirectEditResult =
-  | { ok: true; changes: FileChange[]; summary: string }
+  | { ok: true; changes: FileChange[]; summary: string; checks: CheckStatus[]; spans: FileSpan[]; nextTag: string | null }
   | {
     ok: false;
     /** Plain words for the person: what happened and what to do. */
@@ -77,5 +89,5 @@ export function directEdit(project: Project, root: string, index: RepoIndex, req
   if (!changes.length) return { ok: false, message: 'Nothing changed. The code already says that.', errors: [], checks: [], confirm: [] };
   const check = checkEdit(project, root, index, changes);
   if (!check.ok) return failure([], check.errors);
-  return { ok: true, changes, summary: request.label?.trim().slice(0, 120) || summarize(parsed.data) };
+  return { ok: true, changes, summary: request.label?.trim().slice(0, 120) || summarize(parsed.data), checks: checkStatuses(check), spans: applied.spans, nextTag: applied.nextTag };
 }

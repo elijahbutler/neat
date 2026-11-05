@@ -246,3 +246,37 @@ describe('selection scope', () => {
     expect(orbit.run([{ op: 'set-text', target: 'app/page.tsx:10:9', text: 'x' }], { selection: 'app/page.tsx:9:8' }).result.errors.map((e) => [e.op, e.code])).toEqual([[-1, 'target-not-found']]);
   });
 });
+
+describe('following the selection across an edit', () => {
+  const heading = 'app/about/page.tsx:9:9';
+  const lineOf = (text: string, needle: string) => text.split('\n').findIndex((line) => line.includes(needle)) + 1;
+
+  test('an import and an inserted sibling above move the selection down, and a later edit uses the new tag', () => {
+    const first = orbit.run([{ op: 'insert-jsx', anchor: heading, position: 'before', jsx: '<Button intent="quiet" href="/">Hi</Button>' }], { selection: heading });
+    const text = after(first.result, 'app/about/page.tsx');
+    const moved = first.result.nextTag!;
+    expect(moved).toBe(`app/about/page.tsx:${lineOf(text, '<h1')}:9`);
+    expect(moved).not.toBe(heading);
+    // The same project after the first edit, as the worker would hold it, accepts the new tag and refuses the old one.
+    const sf = orbit.project.getSourceFileOrThrow(join(orbit.root, 'app/about/page.tsx'));
+    const original = sf.getFullText();
+    try {
+      sf.replaceWithText(text);
+      const second = orbit.run([{ op: 'set-text', target: moved, text: 'Moved' }], { selection: moved });
+      expect(second.result.errors).toEqual([]);
+      expect(second.result.nextTag).toBe(moved);
+      // The old tag still names an element, just not the heading: following the selection is not optional.
+      expect(sf.getFullText().split('\n')[8]).not.toContain('<h1');
+    } finally { sf.replaceWithText(original); }
+  });
+
+  test('without a scope there is no selection to follow', () => {
+    const none = orbit.run([{ op: 'set-text', target: heading, text: 'Five' }], null);
+    expect(none.result.nextTag).toBeNull();
+  });
+
+  test('an edit in another file leaves the selection tag as it was', () => {
+    const run = orbit.run([{ op: 'set-text', target: heading, text: 'Five' }], { selection: heading });
+    expect(run.result.nextTag).toBe(heading);
+  });
+});
