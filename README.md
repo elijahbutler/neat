@@ -35,6 +35,8 @@ Checks compare new syntax and type diagnostics, imports, and variant values agai
 
 Undoing the newest kept step drops its commit. Undoing an earlier step records a reversal and preserves later independent work. If later steps overlap or depend on it, Undo refuses and explains which work must be taken back first.
 
+Undo actions cannot be redone. Reversal commits remain in delivered history.
+
 ## Resume after a restart
 
 Close the browser without stopping the preview, or press Ctrl+C to stop the worker and remove its temporary worktree. Run the same command again to resume the latest saved pass for that repository and app, at its original base commit.

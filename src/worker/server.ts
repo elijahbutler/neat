@@ -390,10 +390,11 @@ async function change(s: Session, action: 'ask' | 'edit' | 'confirm' | 'cancel' 
     }).catch((error: unknown) => { forgetProject(s); throw error; });
     forgetProject(s);
     const dropped = result.mode === 'dropped';
-    // Only the newest step leaves the files exactly as it found them, so only then can a tag be followed back across it.
+    const changedFiles = new Set(result.changes.map(change => change.file));
+    // Only the newest step can map changed offsets back. An earlier undo preserves tags in files it did not rewrite.
     const moved = dropped
       ? moveTags(tags, result.changes.map((c) => ({ file: c.file, before: c.after, after: c.before })), result.entry.spans, 'inverse')
-      : Object.fromEntries(tags.map((tag) => [tag, null]));
+      : Object.fromEntries(tags.map((tag) => { const file = tagFile(tag); return [tag, file && !changedFiles.has(file) ? tag : null]; }));
     return json({ ...view(s), nextTag: typeof body.tag === 'string' ? moved[body.tag] ?? null : null, moved });
   }
   if (!s.pending) return fail(409, 'There is no change waiting to be kept or undone.');

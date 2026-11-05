@@ -13,6 +13,9 @@ export function bridgeSource(editorOrigin: string): string {
   var box = null;
   var label = null;
   var selected = null;
+  var wantedTag = null;
+  var waitingNode = null;
+  var waitingKey = null;
   // In-place text editing. \`asked\` is the element whose text the editor is checking, \`editing\` the one being typed
   // in, and \`committed\` the last one sent, kept so a refused edit can be put back.
   var asked = null;
@@ -85,6 +88,49 @@ export function bridgeSource(editorOrigin: string): string {
   }
 
   function keyOf(el) { return el.getAttribute('data-nl-inst') || el.getAttribute('data-nl-src'); }
+
+  function restoreSelection(confirmed) {
+    if (!selecting || editing) return;
+    // Before the editor confirms a new tag, keep the node's identity. Its old tag may already name a neighbor.
+    if (!wantedTag) {
+      if (selected) show(selected.isConnected ? selected : null, selected.isConnected ? nameOf(selected) : '');
+      return;
+    }
+    // The new tag can still name a neighbor in the old DOM. Wait until the selected node changes or leaves it.
+    if (waitingNode && waitingNode.isConnected && keyOf(waitingNode) === waitingKey && wantedTag !== waitingKey) {
+      show(null, '');
+      return;
+    }
+    if (waitingNode && waitingNode.isConnected) {
+      selected = waitingNode;
+      wantedTag = null;
+      waitingNode = null;
+      waitingKey = null;
+      show(selected, nameOf(selected));
+      return;
+    }
+    if (!confirmed && wantedTag === waitingKey) { show(null, ''); return; }
+    var key = wantedTag;
+    var nodes = document.querySelectorAll('[data-nl-inst], [data-nl-src]');
+    var next = null;
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute('data-nl-inst') === key || nodes[i].getAttribute('data-nl-src') === key) { next = nodes[i]; break; }
+    }
+    if (!next) { show(null, ''); return; }
+    waitingNode = null;
+    waitingKey = null;
+    wantedTag = null;
+    selected = next;
+    show(selected, nameOf(selected));
+  }
+
+  function clearSelection() {
+    selected = null;
+    wantedTag = null;
+    waitingNode = null;
+    waitingKey = null;
+    show(null, '');
+  }
 
   function clean(text) { return String(text || '').replace(/\\s+/g, ' ').trim(); }
 
@@ -181,6 +227,9 @@ export function bridgeSource(editorOrigin: string): string {
     e.preventDefault();
     e.stopPropagation();
     selected = el;
+    wantedTag = null;
+    waitingNode = null;
+    waitingKey = null;
     show(el, nameOf(el));
     send({ type: 'neat:select', target: describe(el), route: location.pathname });
   }, true);
@@ -191,7 +240,7 @@ export function bridgeSource(editorOrigin: string): string {
     if (e.origin !== EDITOR || !e.data || typeof e.data.type !== 'string') return;
     if (e.data.type === 'neat:mode') {
       selecting = !!e.data.selecting;
-      if (!selecting) { finishEditing(false); selected = null; show(null, ''); }
+      if (!selecting) { finishEditing(false); clearSelection(); }
     }
     // The editor answers a double-click once the worker has confirmed the text is written in the JSX.
     if (e.data.type === 'neat:text-edit' && asked && keyOf(asked) === e.data.key && !editing) startEditing(asked);
@@ -199,15 +248,26 @@ export function bridgeSource(editorOrigin: string): string {
       committed.el.textContent = committed.original;
       committed = null;
     }
-    if (e.data.type === 'neat:clear') { selected = null; show(null, ''); }
-    if (e.data.type === 'neat:reselect' && selected) {
-      // After a hot reload the selected node may be replaced; find it again by its tag.
-      var key = e.data.tag;
-      var next = key && (document.querySelector('[data-nl-inst="' + key + '"]') || document.querySelector('[data-nl-src="' + key + '"]'));
-      selected = next || null;
-      show(selected, selected ? nameOf(selected) : '');
+    if (e.data.type === 'neat:clear') clearSelection();
+    if (e.data.type === 'neat:reselect') {
+      if (selected) { waitingNode = selected; waitingKey = keyOf(selected); }
+      wantedTag = typeof e.data.tag === 'string' ? e.data.tag : null;
+      if (wantedTag) restoreSelection(true);
+      else clearSelection();
     }
   });
+
+  if (typeof MutationObserver === 'function') {
+    var observer = new MutationObserver(function (records) {
+      for (var i = 0; i < records.length; i++) {
+        // Drawing the outline changes its own text node. Ignore those mutations to avoid observing our own redraws.
+        var target = records[i].target;
+        if (box && box.contains(target)) continue;
+        if (wantedTag || (selected && (!selected.isConnected || target === document.documentElement || selected.contains(target) || target.contains(selected)))) { restoreSelection(false); break; }
+      }
+    });
+    observer.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-nl-src', 'data-nl-inst', 'class'] });
+  }
 
   var last = '';
   setInterval(function () {

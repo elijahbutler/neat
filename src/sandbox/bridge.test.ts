@@ -14,6 +14,8 @@ type Listener = (event: Record<string, unknown>) => void;
 
 /** Just enough of a page to run the bridge: listeners, attributes, and text. No layout, no browser. */
 function fakePage() {
+  const elements: Array<{ isConnected: boolean; hasAttribute: (name: string) => boolean; getAttribute: (name: string) => string | null; children: unknown[]; style: Record<string, string> }> = [];
+  let mutations: ((records: Array<{ target: unknown }>) => void) | null = null;
   const listeners = (store: Map<string, Listener[]>) => ({
     addEventListener: (type: string, fn: Listener) => { store.set(type, [...(store.get(type) ?? []), fn]); },
     removeEventListener: (type: string, fn: Listener) => { store.set(type, (store.get(type) ?? []).filter((l) => l !== fn)); },
@@ -22,7 +24,7 @@ function fakePage() {
     const own = new Map<string, Listener[]>();
     const fire = (type: string) => { for (const fn of own.get(type) ?? []) fn({}); };
     const el = {
-      nodeType: 1, tagName, textContent, parentElement: null, children: [] as unknown[],
+      nodeType: 1, tagName, textContent, parentElement: null, children: [] as unknown[], isConnected: true,
       style: { outline: '', outlineOffset: '', cssText: '', display: '' },
       get contentEditable() { return attrs.contenteditable ?? 'inherit'; },
       hasAttribute: (name: string) => name in attrs,
@@ -31,27 +33,45 @@ function fakePage() {
       removeAttribute: (name: string) => { delete attrs[name]; },
       getBoundingClientRect: () => ({ x: 0, y: 0, left: 0, top: 0, width: 10, height: 10 }),
       contains: (other: unknown): boolean => other === el,
-      appendChild: () => undefined,
+      appendChild: (child: unknown) => { el.children.push(child); },
       focus: () => undefined,
       blur: () => fire('blur'),
       fire,
       ...listeners(own),
     };
+    elements.push(el);
     return el;
   };
   const doc = new Map<string, Listener[]>();
   const win = new Map<string, Listener[]>();
   const sent: Array<Record<string, unknown>> = [];
-  const document = { ...listeners(doc), documentElement: element('html', {}, ''), createElement: () => element('div', {}, ''), querySelector: () => null };
+  const document = {
+    ...listeners(doc), documentElement: element('html', {}, ''), createElement: () => element('div', {}, ''),
+    querySelector: (selector: string) => {
+      const match = /^\[(data-nl-(?:src|inst))="(.*)"\]$/.exec(selector);
+      return match ? elements.find(el => el.isConnected && el.getAttribute(match[1]!) === match[2]) ?? null : null;
+    },
+    querySelectorAll: () => elements.filter(el => el.isConnected && (el.hasAttribute('data-nl-src') || el.hasAttribute('data-nl-inst'))),
+  };
   const window = {
     ...listeners(win),
     parent: { postMessage: (message: Record<string, unknown>) => { sent.push(message); } },
     getComputedStyle: (el: { css?: Record<string, string> }) => el.css ?? {},
   };
-  new Function('window', 'document', 'location', 'setInterval', bridgeSource('http://editor.test'))(window, document, { pathname: '/about' }, () => 0);
+  class Observer {
+    constructor(callback: (records: Array<{ target: unknown }>) => void) { mutations = callback; }
+    observe() {}
+  }
+  new Function('window', 'document', 'location', 'setInterval', 'MutationObserver', bridgeSource('http://editor.test'))(window, document, { pathname: '/about' }, () => 0, Observer);
   return {
     sent,
     element,
+    mutate: () => { mutations?.([{ target: document.documentElement }]); },
+    outline: () => {
+      const box = elements.find(el => el.hasAttribute('data-neat-overlay'));
+      const label = box?.children[0];
+      return { display: box?.style.display, left: box?.style.left, label: label && typeof label === 'object' && 'textContent' in label ? label.textContent : null };
+    },
     last: () => sent.at(-1)!,
     dom: (type: string, extra: Record<string, unknown>) => {
       const e = { prevented: false, preventDefault: () => { e.prevented = true; }, stopPropagation: () => undefined, ...extra };
@@ -61,6 +81,74 @@ function fakePage() {
     fromEditor: (data: Record<string, unknown>, origin = 'http://editor.test') => { for (const fn of win.get('message') ?? []) fn({ origin, data }); },
   };
 }
+
+describe('following source tags through hot reload', () => {
+  test('waits for the selected element instead of outlining its old neighbor', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    const neighbor = page.element('DIV', { 'data-nl-src': 'app/page.tsx:2:1' }, 'Neighbor');
+    page.dom('click', { target: heading });
+    page.fromEditor({ type: 'neat:reselect', tag: 'app/page.tsx:2:1' });
+    expect(page.outline().display).toBe('none');
+    heading.setAttribute('data-nl-src', 'app/page.tsx:2:1');
+    neighbor.setAttribute('data-nl-src', 'app/page.tsx:3:1');
+    page.mutate();
+    expect(page.outline()).toMatchObject({ display: 'block', label: 'h1  page.tsx:2:1' });
+  });
+
+  test('uses the confirmed tag to rebind a replaced node', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    page.dom('click', { target: heading });
+    page.fromEditor({ type: 'neat:reselect', tag: 'app/page.tsx:1:1' });
+    heading.isConnected = false;
+    const replacement = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Updated heading');
+    replacement.getBoundingClientRect = () => ({ x: 80, y: 40, left: 80, top: 40, width: 10, height: 10 });
+    page.mutate();
+    expect(page.outline().display).toBe('none');
+    page.fromEditor({ type: 'neat:reselect', tag: 'app/page.tsx:1:1' });
+    expect(page.outline()).toMatchObject({ display: 'block', left: '80px', label: 'h1  page.tsx:1:1' });
+  });
+
+  test('keeps the same node when tags change before the editor responds', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    const neighbor = page.element('DIV', { 'data-nl-src': 'app/page.tsx:2:1' }, 'Neighbor');
+    page.dom('click', { target: heading });
+    heading.setAttribute('data-nl-src', 'app/page.tsx:2:1');
+    neighbor.setAttribute('data-nl-src', 'app/page.tsx:1:1');
+    page.mutate();
+    expect(page.outline()).toMatchObject({ display: 'block', label: 'h1  page.tsx:2:1' });
+    page.fromEditor({ type: 'neat:reselect', tag: 'app/page.tsx:2:1' });
+    page.mutate();
+    expect(page.outline()).toMatchObject({ display: 'block', label: 'h1  page.tsx:2:1' });
+  });
+
+  test('does not bind a detached node to its neighbor before a response', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    const neighbor = page.element('DIV', { 'data-nl-src': 'app/page.tsx:2:1' }, 'Neighbor');
+    page.dom('click', { target: heading });
+    heading.isConnected = false;
+    neighbor.setAttribute('data-nl-src', 'app/page.tsx:1:1');
+    page.element('H1', { 'data-nl-src': 'app/page.tsx:2:1' }, 'Updated heading');
+    page.mutate();
+    expect(page.outline().display).toBe('none');
+    page.fromEditor({ type: 'neat:reselect', tag: 'app/page.tsx:2:1' });
+    expect(page.outline()).toMatchObject({ display: 'block', label: 'h1  page.tsx:2:1' });
+  });
+
+  test('clearing a pending selection prevents its later return', () => {
+    const page = fakePage();
+    const heading = page.element('H1', { 'data-nl-src': 'app/page.tsx:1:1' }, 'Heading');
+    page.dom('click', { target: heading });
+    page.fromEditor({ type: 'neat:reselect', tag: 'app/page.tsx:2:1' });
+    page.fromEditor({ type: 'neat:clear' });
+    heading.setAttribute('data-nl-src', 'app/page.tsx:2:1');
+    page.mutate();
+    expect(page.outline().display).toBe('none');
+  });
+});
 
 describe('editing text in place', () => {
   const KEY = 'app/about/page.tsx:9:9';
