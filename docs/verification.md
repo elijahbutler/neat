@@ -36,6 +36,20 @@ A separate browser regression opened a shared proposal, stopped the preview, and
 
 No model API key was available. Ask used the real HTTP provider adapter against a local scripted provider with fake credentials. These runs verify request handling, operation checks, confirmation, selection updates, and delivery. They do not measure model output quality or verify a live model service.
 
+## Additional local pilot
+
+A locally owned Next.js 15.5.14 App Router project completed the workflow in an isolated worktree. Its original checkout's HEAD, status, and index stayed unchanged. The pilot used Bun 1.4.4 and a local scripted model provider.
+
+Native browser checks covered mixed-content text refusal, editing a plain-text child, visible padding changes, timeline diffs and honest check labels, and browser reload. Shared-component confirmation listed four routes and four source call sites. Escape cancelled without writing. A new untracked consumer invalidated an existing proposal. A valid proposal survived reload and applied without another provider call.
+
+The worker restored the same pass, Git tree, and edit statuses after a restart, including earlier-step undo records. An external sandbox file change produced a refusal and a recovery notice without overwriting those bytes. Undoing an earlier edit preserved a later change in another file. Redo of an undo is unsupported.
+
+Hot-reload checks delayed the API response and hot-update responses separately. Both event orders preserved the selected heading after Ask and pending Undo. Separate Chromium checks exercised native mutation observers with tag changes, replacement nodes, and explicit selection clearing.
+
+Delivery through the browser preserved an advanced, detached, dirty input checkout and its index bytes. Reusing a branch name added a numeric suffix. The downloaded patch applied with `git am -3` in another worktree and produced the delivered branch's exact tree. Preview injection files stayed out of the result. Pending edits disabled delivery, and keeping another edit disabled the stale branch's PR action. No PR action was invoked. The delivery panel fit a 390-by-844 viewport and supported keyboard focus. Live requests also confirmed the Host and Origin guards.
+
+Independent reviews found diagnostic path exposure, an undo staging race, and selection timing issues. Regression tests reproduced those failures before their fixes. Fault-injection tests also verified undo recovery when a save fails after renaming the pass file. The subsequent suite passed with `bun --smol test --timeout 30000`: 442 passed, 11 Docker tests skipped, and none failed. Typecheck passed.
+
 ## Automated checks
 
 Before publishing each slice, validation ran:

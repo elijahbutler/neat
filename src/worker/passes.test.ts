@@ -180,6 +180,20 @@ test('Undo on an earlier step keeps the work after it, records a revert, and sur
   await again.close();
 }, 90_000);
 
+test('an earlier undo preserves selected tags in files it does not change', async () => {
+  const r = await run();
+  await r.edit(h1, setText(h1, 'Welcome')); await r.keep();
+  await r.edit(list, [{ op: 'replace-class', target: list, from: 'gap-2', to: 'gap-4' }]); await r.keep();
+  const steps = (await r.call(r.prefix)).body.timeline!;
+  const layout = tagOf(LAYOUT, 'app/layout.tsx', '<html');
+  const undone = await r.undo({ step: steps[0]!.id, tag: layout, tags: [layout, para] });
+  expect(undone.status).toBe(200);
+  expect(undone.body.nextTag).toBe(layout);
+  expect(undone.body.moved).toEqual({ [layout]: layout, [para]: null });
+  expect(await read(r.dir, 'app/layout.tsx')).toBe(LAYOUT);
+  await r.close();
+}, 90_000);
+
 test('an earlier undo commits its validated snapshot even if a watcher rewrites the file during staging', async () => {
   const { watch, writeFileSync } = await import('node:fs');
   const r = await run();

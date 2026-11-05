@@ -624,9 +624,10 @@ function RecoveryNotice({ recovery, onDismiss }: { recovery: NonNullable<Session
   if (recovery.failure?.reason === 'base-missing') lines.push('A saved pass was left alone because the commit it started from is no longer in this repository. This session starts a new pass.');
   else if (recovery.failure) {
     const why = recovery.failure.reason === 'changed' || recovery.failure.reason === 'conflict' ? 'the code it changed is different now' : 'it could not be applied safely';
-    lines.push(`Restored ${recovery.restored} kept ${recovery.restored === 1 ? 'step' : 'steps'}. "${recovery.failure.summary}" could not be put back because ${why}, so it and the steps after it were left out. The saved pass is still on disk.`);
+    const restored = recovery.restored > 0 ? 'Restored the earlier part of your pass.' : 'Your saved pass could not be restored.';
+    lines.push(`${restored} "${recovery.failure.summary}" could not be put back because ${why}, so it and the steps after it were left out. The saved pass is still on disk.`);
   }
-  else if (recovery.restored > 0) lines.push(`Restored ${recovery.restored} kept ${recovery.restored === 1 ? 'step' : 'steps'} from your last pass.`);
+  else if (recovery.restored > 0) lines.push('Restored your saved pass.');
   if (recovery.skipped > 0) lines.push(`${recovery.skipped} saved pass ${recovery.skipped === 1 ? 'file' : 'files'} could not be read and ${recovery.skipped === 1 ? 'was' : 'were'} skipped.`);
   if (!lines.length) return null;
   return (
